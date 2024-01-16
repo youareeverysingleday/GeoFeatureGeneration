@@ -13,6 +13,49 @@ the target is to process the data into a format that enters machine learning.
 
 This package can concat multi vectorized features to one matrix.
 
+## File structure
+
+.
+├─README.md
+├─GeoFeatureGeneration.py
+├─Data
+│  ├─BeiJing
+│  │   └─Data
+│  │       ├─AccommodationServices.csv
+│  │       ├─BusinessResidence.csv
+│  │       ├─CommunalFacilities.csv
+│  │       ├─Corporation.csv
+│  │       ├─FamousScenery.csv
+│  │       ├─FinancialandInsuranceServices.csv
+│  │       ├─GovernmentAgenciesandSocialOrganizations.csv
+│  │       ├─HealthCareServices.csv
+│  │       ├─LifeService.csv
+│  │       ├─Restaurant.csv
+│  │       ├─ScienceEducationandCulturalServices.csv
+│  │       ├─Shopping.csv
+│  │       ├─SportsLeisureServices.csv
+│  │       └─TransportationFacilitiesServices.csv
+│  ├─Geolife Trajectories 1.3
+│  │   └─Data
+│  │       ├─000
+│  |       │  └─Trajectory
+│  │       ├─001
+│  |       │  └─Trajectory
+│  │       ├─002
+│  |       │  └─Trajectory
+│  │       ├─003
+│  |       │  └─Trajectory
+│  |       ...
+│  │       ├─180
+│  |       │  └─Trajectory
+│  |       └─181
+│  |          └─Trajectory
+│  └─Output
+│      └─MultipleFeatures
+└─Test
+
+
+
 ## Output format describe
 
 |num|format|describe|

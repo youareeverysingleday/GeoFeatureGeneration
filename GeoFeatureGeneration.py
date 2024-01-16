@@ -15,6 +15,7 @@ import datetime
 import time
 
 import os
+import sys
 import math
 
 import multiprocessing
@@ -109,7 +110,7 @@ def area_to_params(location, accuracy=500, method='rect'):
 def GPS_to_grids_rect(lon, lat, params, from_origin=False):
     '''
     Match the GPS data to the grids. The input is the columns of
-    longitude, latitude, and the grids parameter. The output is the grid ID.
+    longitude, latitude, and the grids parameter. The Output is the grid ID.
 
     Parameters
     -------
@@ -175,7 +176,7 @@ def GPS_to_grids_rect(lon, lat, params, from_origin=False):
 def GPS_to_grid(lon, lat, params):
     '''
     Match the GPS data to the grids. The input is the columns of
-    longitude, latitude, and the grids parameter. The output is the grid ID.
+    longitude, latitude, and the grids parameter. The Output is the grid ID.
 
     Parameters
     -------
@@ -274,16 +275,192 @@ of [lon1,lat1,lon2,lat2]. (lon1,lat1) is the lower left corner and \
     return data1
 
 
+# --- 辅助函数 --
 
-# ------------------------------------------------------------------
+def PrintStartInfo(functionName, description=''):
+    startTime = datetime.datetime.now()
+    print('Start function: {} ,\npid: {} ,\nstart at: {} .'.format(functionName, os.getpid(), startTime.strftime('%Y-%m-%d %H:%M:%S')))
+    if description != '':
+        print(description)
+    
+    return startTime
+
+def PrintEndInfo(functionName, startTime, description=''):
+    print('End function: {} ,\npid: {} ,\ncompleted time: {} ,\nconsume time: {} .'.format(functionName, os.getpid(), 
+                                                                                    datetime.datetime.now(), 
+                                                                                    datetime.datetime.now() - startTime))
+    if description != '':
+        print(description)
+
+# --- 全局变量设置 ---
+
+#地理特征边界。
+gBounds = [115.7, 39.4, 117.4, 41.6]
+# 所有的地理参数。
+gGeoParameters = area_to_params(gBounds, accuracy = 1000, method='rect')
+
+# PoI特征输入目录。
+gPoIFolderPath = './Data/BeiJing/'
+# 保存PoI特征的路径及文件名. Defaults to './Data/Output/PoIFeature.csv'.
+gPoIMatrixSavePath = './Data/Output/MultipleFeatures/PoIFeature.csv'
+gRenameColumns = {'名称':'name','大类':'category','中类':'class', '小类':'type', 
+                    '省':'province', '市':'city', '区':'district', 'WGS84_经度':'longitude', 'WGS84_纬度':'latitude'}
+gFileterColumne = ['名称', '大类', '中类', '小类', '省', '市', '区', 'WGS84_经度', 'WGS84_纬度']
+gSelectedColumne = ['category', 'longitude', 'latitude']
+gCategoryMapNumber = {'餐饮服务':0, '商务住宅':1, '公共设施':2, '公司企业':3, '风景名胜':4, 
+                    '金融保险服务':5, '政府机构及社会团体':6, '医疗保健服务':7, '生活服务':8, 
+                    '餐饮服务':9, '科教文化服务':10, '购物服务':11, '体育休闲服务':12, '交通设施服务':13}
 
 
-def SampleTrajectory(user, samplingIntervalRow=0, FolderPath = "./Data/Geolife Trajectories 1.3/Data/"):
+# 轨迹数据的存储目录。
+gTrajectoryFolderPath = "./Data/Geolife Trajectories 1.3/Data/"
+# InputTrajectoryCsvSavePath = './Data/output/Trajectories/{}.csv'
+# 单个用户的保存目录。
+gOutputProecessedTrajectory='./Data/output/ProcessedTrajectories/{}.csv'
+# 所有用户的保存目录。
+gInputTrajectoryCsvSavePath = './Data/output/Trajectories/{}.csv'
+# 保存的输出的根目录。
+gSavePath='./Data/output/'
+# TrajectoriesBasePath = './Data/Geolife Trajectories 1.3/Data/'
+        
+
+# --- 获取PoI特征 ---
+
+def GeneratePoIFeature(FilePath, fileParameters, GeoParameters, gSharedData, lock):
     """_summary_
-    对轨迹数据进行采样。
+    生成PoI特征。
+    Args:
+        FilePath (_type_): _description_
+        fileParameters (_type_): _description_
+        GeoParameters (_type_): _description_
+        gSharedData (_type_): _description_
+        lock (_type_): _description_
+    """
+    renameColumns = fileParameters['renameColumns']
+    FileterColumne = fileParameters['FileterColumne']
+    SelectedColumne = fileParameters['SelectedColumne']
+    CategoryMapNumber = fileParameters['CategoryMapNumber']
 
-    可以根据
+    # 读取数据。
+    df = pd.read_csv(FilePath, encoding='gb18030')
+    
+    # 将列名修改为英文。
+    df = df[FileterColumne].rename(columns=renameColumns)
+    # 选取要用的列。
+    df = df[SelectedColumne].copy()
+    # 剔除范围之外的坐标。
+    # 在没有剔除范围之外的坐标时，会计算为负值的grid。
+    # 注意这里计算的是地域特征，也就是说不能存在负值的。
+    # 可以存在负值，也就是说明这个地方在区域之外，但是有特征。最重要的是负数表明了一种语义。
+    df = clean_outofbounds(df, bounds = GeoParameters, col = ['longitude', 'latitude'])
 
+    # 将特征由中文全部转化为数值。
+    df['category'] = df['category'].map(CategoryMapNumber)
+    # 生成区域ID。
+    _, _, df['gridID'] = GPS_to_grid(df['longitude'],df['latitude'], GeoParameters)
+    # 选取最终进行聚合的列。
+    df = df[['category', 'gridID']].copy()
+    # print(df.head(3))
+    # 创建一个空列，用于在生成透视表时存储值。
+    df['temp'] = 0
+    print(df.head(3))
+    df = df.pivot_table(index='gridID',columns='category', values='temp', aggfunc='count').fillna(0)
+    print(df.head(3))
+
+    with lock:
+        # 按列名拼接。也就是列名相同的会自动对应，缺少的列填空值。
+        # 此时的index是gridID，后面还需要聚合操作的，所以不能忽略。
+        gSharedData.dat = pd.concat([gSharedData.dat, df]).fillna(0.0)
+
+def GetPoIFeature(PoIFolderPath='./Data/BeiJing/', 
+                  PoIMatrixSavePath='./Data/Output/MultipleFeatures/PoIFeature.csv', 
+                  Bounds=[115.7, 39.4, 117.4, 41.6],
+                  renameColumns={'名称':'name','大类':'category','中类':'class', '小类':'type',
+                                 '省':'province', '市':'city', '区':'district', 'WGS84_经度':'longitude', 'WGS84_纬度':'latitude'},
+                  FileterColumne=['名称', '大类', '中类', '小类', '省', '市', '区', 'WGS84_经度', 'WGS84_纬度'],
+                  SelectedColumne=['category', 'longitude', 'latitude'],
+                  CategoryMapNumber={'餐饮服务':0, '商务住宅':1, '公共设施':2, '公司企业':3, '风景名胜':4, 
+                                     '金融保险服务':5, '政府机构及社会团体':6, '医疗保健服务':7, '生活服务':8, 
+                                     '餐饮服务':9, '科教文化服务':10, '购物服务':11, '体育休闲服务':12, '交通设施服务':13}):
+
+    """_summary_
+    通过文件获取PoI的特征。
+    Args:
+        PoIFolderPath (str, optional): PoI文件夹的路径. Defaults to './Data/BeiJing/'.
+        PoIMatrixSavePath (str, optional): 保存PoI特征的路径及文件名. Defaults to './Data/Output/PoIFeature.csv'.
+        Bounds (list, optional): 传入的区域边界. Defaults to [115.7, 39.4, 117.4, 41.6].
+        renameColumns (dict, optional): 对于中文而言，需要修改为英文. Defaults to {'名称':'name','大类':'category','中类':'class', '小类':'type',
+                                 '省':'province', '市':'city', '区':'district', 'WGS84_经度':'longitude', 'WGS84_纬度':'latitude'}.
+        FileterColumne (list, optional): 选择有用的列，对于不用的列丢弃. Defaults to ['名称', '大类', '中类', '小类', '省', 
+                '市', '区', 'WGS84_经度', 'WGS84_纬度'].
+        SelectedColumne (list, optional): 生成特征的时候可能需要多种类型的特征，不仅仅是经纬度特征。
+                在使用语言模型的时候也需要描述性特征可以描述跨区域的特征，所以这里要进行选择. Defaults to ['category', 'longitude', 'latitude'].
+                也就是在必要的时候需要所有的列['name', 'category', 'class','type','province', 'city', 'district','longitude', 'latitude']。
+                目前只选择了3列。
+        CategoryMapNumber (dict, optional): 中文类别需要映射为数字. Defaults to {'餐饮服务':0, '商务住宅':1, '公共设施':2, '公司企业':3, '风景名胜':4, 
+                                     '金融保险服务':5, '政府机构及社会团体':6, '医疗保健服务':7, '生活服务':8, 
+                                     '餐饮服务':9, '科教文化服务':10, '购物服务':11, '体育休闲服务':12, '交通设施服务':13}.
+    
+        
+    Returns:
+        _type_: _description_
+    """
+    startTime = PrintStartInfo(functionName='GetPoIFeature()')
+    # 检测POI特征的路径是否存在。不存在则返回。
+    if os.path.exists(PoIFolderPath) ==False:
+        print('{} is not exist.'.format(PoIFolderPath))
+        return None
+
+    AllFilesName = os.listdir(PoIFolderPath)
+    # selected_columns = ['名称', '大类', '中类', '小类', '省', '市', '区', 'WGS84_经度', 'WGS84_纬度']
+    
+    gMultiProcessingPool = multiprocessing.Pool()
+    gMultiProcessingManager = multiprocessing.Manager()
+    gMultiProcessinglock = gMultiProcessingManager.Lock()
+    gSharedData = gMultiProcessingManager.Namespace()
+    
+    # 文件相关参数。
+    fileParameters = {'renameColumns':renameColumns, 'FileterColumne':FileterColumne, 'SelectedColumne':SelectedColumne,
+                      'CategoryMapNumber':CategoryMapNumber}
+    # 地理特征参数。
+    # GeoParameters = area_to_params(gBounds, accuracy = 1000, method='rect')
+    
+    maxloncol = gGeoParameters['maxloncol']
+    maxlatcol = gGeoParameters['maxlatcol']
+    
+    # 通过类别生成列名。
+    columnName = list(CategoryMapNumber.values())
+    gSharedData.dat = pd.DataFrame(columns=columnName)
+
+    for fn in AllFilesName:
+        FilePath = (PoIFolderPath + "{}").format(fn)
+        # 多进程处理。
+        gMultiProcessingPool.apply_async(GeneratePoIFeature, 
+                                         args=(FilePath, fileParameters, gGeoParameters, gSharedData, gMultiProcessinglock))
+    
+    gMultiProcessingPool.close()
+    gMultiProcessingPool.join()
+    
+    # 如果存在重复的index，那么将其按行相加合并。
+    gSharedData.dat = gSharedData.dat.groupby(level=0).sum()
+
+    # # 创建包含所有grid和特征的dataframe。
+    # RegionFeature = pd.DataFrame()
+
+    # 如果PoI特征文件已经存在，那么发出提示，并且之后将会覆盖。
+    if os.path.exists(PoIMatrixSavePath) == True:
+        print('{} is exist, will overwrite.'.format(PoIMatrixSavePath))
+
+    gSharedData.dat.to_csv(PoIMatrixSavePath)
+    PrintEndInfo(functionName='GetPoIFeature()', startTime=startTime)
+
+
+# --- 读取轨迹数据 ---
+
+def GetSingleUserTrajectory(user, samplingIntervalRow=0, 
+                            FolderPath = "../Data/Geolife Trajectories 1.3/Data/"):
+    """_summary_
+    从原始文件中获取单个用户的轨迹数据。
     Args:
         user (int): 用户编号。也就是Trajectories文件中用户文件夹的名字。
         samplingIntervalRow (int, optional): 
@@ -323,3 +500,174 @@ def SampleTrajectory(user, samplingIntervalRow=0, FolderPath = "./Data/Geolife T
     # df.shape()：
     print ('Total GPS points: ' + str(df_sampling.shape[0]))  
     return df_sampling
+
+def GetEntireTime(df):
+    # 先拼成完整的时间。
+    df['entireTime'] = \
+        pd.Timestamp(datetime.datetime.strptime((df['date'] + ' ' + df['time']),'%Y-%m-%d %H:%M:%S'))
+    return df
+
+# --- 轨迹预处理 ---
+
+def ProcessSingleUserTrajectory(user):
+    """_summary_
+    对单个用户的轨迹信息进行处理。
+    主要完成2个操作：1. 将时间特征各自单独分离出来；2. 将经纬度和区域ID对应起来。
+    Args:
+        SingleUserTrajectory (DataFrame): 输入单个用户的轨迹信息。
+        user (_type_): _description_
+        OutputProecessedTrajectory (_type_): _description_
+    """
+
+    SingleUserTrajectory = pd.read_csv(gInputTrajectoryCsvSavePath.format(user))
+    # SingleUserTrajectory_pd = pd.read_csv(InputTrajectoryCsvSavePath.format(user))
+    # # 如果不存在，那么重新读取。
+    # if os.path.exists(InputTrajectoryCsvSavePath.format(user))==False:
+
+    #     SingleUserTrajectory_pd = GetSingleUserTrajectory(user)
+    #     SingleUserTrajectory_pd['index'] = SingleUserTrajectory_pd.index
+    #     # 将所有用户的轨迹转换为CSV之后缓存下来。
+    #     SingleUserTrajectory_pd.to_csv(InputTrajectoryCsvSavePath.format(user))
+    # else:
+    #     SingleUserTrajectory_pd = pd.read_csv(InputTrajectoryCsvSavePath.format(user))
+
+    # 首先把数据中需要的列都做出来。
+    SingleUserTrajectory = SingleUserTrajectory.apply(GetEntireTime, axis=1)
+    SingleUserTrajectory['weekofyear'] = SingleUserTrajectory['entireTime'].dt.weekofyear
+    # 一周中的星期几。
+    SingleUserTrajectory['dayofweek'] = SingleUserTrajectory['entireTime'].dt.dayofweek
+    # 一年中的第几天。
+    SingleUserTrajectory['dayofyear'] = SingleUserTrajectory['entireTime'].dt.dayofyear
+    # 一年中的第几个季度。
+    SingleUserTrajectory['quarter'] = SingleUserTrajectory['entireTime'].dt.quarter
+    # SingleUserTrajectory_pd['weekday_name'] = SingleUserTrajectory_pd['entireTime'].dt.weekday_name
+    # 一年中的第几个月。
+    SingleUserTrajectory['month'] = SingleUserTrajectory['entireTime'].dt.month
+    # 第几年。这个没有必要。
+    # SingleUserTrajectory_pd['year'] = SingleUserTrajectory_pd['entireTime'].dt.year
+    # 一天中的第几个小时。
+    SingleUserTrajectory['hour'] = SingleUserTrajectory['entireTime'].dt.hour
+    SingleUserTrajectory['halfhour'] = SingleUserTrajectory['entireTime'].dt.floor(freq='30Min')
+    SingleUserTrajectory.rename(columns={'lat': 'latitude', 'lng': 'longitude'}, inplace=True)
+
+    # 生成区域ID。
+    _, _, SingleUserTrajectory['gridID'] = GPS_to_grid(SingleUserTrajectory['longitude'],SingleUserTrajectory['latitude'], gGeoParameters)
+
+    # # 然后把数据中的坐标对应为区域ID。
+    # SingleUserTrajectory = SingleUserTrajectory.apply(CalculateNodeIDFromLatLong, latitudeRangeList=latitudeRangeList, 
+    #                         longitudeRangeList=longitudeRangeList, totalColumn=totalColumn, axis=1)
+    SingleUserTrajectory.to_csv(gOutputProecessedTrajectory.format(user))
+    return SingleUserTrajectory
+
+def PreprocessTrajectory(userRange, 
+                         outputType,
+                         userList=[], 
+                         InputTrajectoryCsvSavePath = '../Data/output/Trajectories/{}.csv', 
+                         savePath='../Data/output/',
+                         TrajectoriesBasePath = '../Data/Geolife Trajectories 1.3/Data/'):
+    """_summary_
+
+    Args:
+        userRange (string): 只有3个值可供选择：single, multi, all。
+                        当range为all时，不需要用到userList。直接从TrajectoriesBasePath目录下读取所有的user轨迹。
+        userList (list): 需要读取的用户列表。需要和range配合使用，如果只读取一个用户的，那么userList中只有一个元素。
+                        如果读取多个用户的，那么userList中会有多个用户。
+                        如果读取全部用户的，那么userList中会有所有用户的ID。
+        savePath (str, optional): 生成的csv文件的保存路径. Defaults to '../Data/output/'.
+        TrajectoriesBasePath (str, optional): 读取输入的用户轨迹目录. Defaults to '../Data/Geolife Trajectories 1.3/Data/'.
+    """
+    saveLcoation = ''
+    if userRange == 'all':
+        userList = next(os.walk(TrajectoriesBasePath))[1]
+        saveLcoation = (savePath + 'Trajectory_{}.csv').format(userRange)
+    elif userRange == 'multi':
+        if len(userList) == 0:
+            print('ERROR, userRange {}, input userlist is NULL.'.format(userRange))
+            return
+        saveLcoation = (savePath + 'Trajectory_{}.csv').format(userRange)
+    elif userRange == 'single':
+        if len(userList) == 0:
+            print('ERROR, userRange {}, input userlist is NULL.'.format(userRange))
+            return
+        # user = userList[0]
+        saveLcoation = (savePath + 'Trajectory_{}_{}.csv').format(userRange, userList[0])
+
+    if outputType == 'independent':
+
+        ProcessPool = multiprocessing.Pool()
+        result = ProcessPool.map(ProcessSingleUserTrajectory, userList)
+
+        # for user in userList:
+        #     # 首先进行声明。
+        #     SingleUserTrajectory_pd = pd.DataFrame()
+        #     # 前面是否已经将轨迹转换为了CSV格式。如果没有转换，那么重新转换一次。如果已经转换了，那么就不再转换。
+        #     if os.path.exists(InputTrajectoryCsvSavePath.format(user))==False:
+        #         SingleUserTrajectory_pd = GetSingleUserTrajectory(user)
+        #         SingleUserTrajectory_pd['index'] = SingleUserTrajectory_pd.index
+        #         # 将所有用户的轨迹转换为CSV之后缓存下来。
+        #         SingleUserTrajectory_pd.to_csv(InputTrajectoryCsvSavePath.format(user))
+        #     else:
+        #         SingleUserTrajectory_pd = pd.read_csv(InputTrajectoryCsvSavePath.format(user))
+
+        pass
+    elif outputType == 'merged':
+        startTime = PrintStartInfo(functionName='PreprocessTrajectory')
+        i = 0
+        MultiTrajectorys_pd = None
+        for user in userList:
+            # print(user)
+            SingleUserTrajectory_pd = GetSingleUserTrajectory(user)
+            SingleUserTrajectory_pd['userID'] = user
+
+            if i == 0:
+                MultiTrajectorys_pd = SingleUserTrajectory_pd.copy()
+            else:
+                MultiTrajectorys_pd = pd.concat([MultiTrajectorys_pd, SingleUserTrajectory_pd])
+                # print(MultiTrajectorys_pd.shape)
+            i += 1
+        # print('get time.')
+        # (MultiTrajectorys_pd['date'] + ' ' + MultiTrajectorys_pd['time']),'%Y-%m-%d %H:%M:%S'
+        MultiTrajectorys_pd['entireTime'] = pd.to_datetime((MultiTrajectorys_pd['date'] + ' ' + MultiTrajectorys_pd['time']), format='%Y-%m-%d %H:%M:%S')
+        # MultiTrajectorys_pd = MultiTrajectorys_pd.apply(GetEntireTime, axis=1)
+        MultiTrajectorys_pd = MultiTrajectorys_pd.drop(labels=['date', 'time'], axis=1)
+        # print('save dataframe.')
+        MultiTrajectorys_pd.to_csv(saveLcoation)
+        PrintEndInfo(functionName='PreprocessTrajectory', startTime=startTime)
+        return MultiTrajectorys_pd
+    
+
+
+
+# --- 合并特征 ---
+
+def CombineRegionFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/', 
+                          FeatureSavePath='./Data/Output/Feature.csv'):
+    pass
+
+# --- 将特征附着到轨迹上 ---
+
+from enum import Enum
+
+class OutputType(Enum):
+    # 每个用户各自存储各自的轨迹特征文件。
+    DesperateTrajectory = 0
+    # 所有用户的轨迹和成为一个文件。
+    CombineTrajectory = 1
+
+    # 将所有用户的轨迹融合成为一个矩阵的文件。
+    # 这个需要很多参数。
+    TrajectoryMatrix = 2
+    # 输入用户和地域的交互矩阵。
+    InteractionMatrix = 3
+
+
+
+def attachFeaturetoTrajectory(featurePath='', trajectoryFolderPath='', outputType=''):
+    """_summary_
+
+    Args:
+        featurePath (str, optional): _description_. Defaults to ''.
+        trajectoryFolderPath (str, optional): _description_. Defaults to ''.
+        outputType (str, optional): 输出附着了特征的轨迹数据. Defaults to ''.
+    """
+    pass
