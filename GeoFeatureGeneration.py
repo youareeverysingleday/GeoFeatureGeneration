@@ -9,6 +9,9 @@
 
 # This package can not run in jupyter, because package has used "mulitprocessing".
 
+# 使用了transbigdata中的部分对经纬度进行处理的代码。
+# 由于最终的输出是需要输入机器学习模型的，所以对源码进行了修改再进行使用。
+
 import pandas as pd
 import numpy as np
 import datetime
@@ -21,6 +24,8 @@ import math
 import multiprocessing
 
 import geopandas as gpd
+
+import sklearn
 
 
 def convertparams(params):
@@ -168,9 +173,9 @@ def GPS_to_grids_rect(lon, lat, params, from_origin=False):
         loncol = loncol[0]
         latcol = latcol[0]
 
-    gridid = loncol * maxloncol + latcol
+    grid = loncol * maxloncol + latcol
     # print(loncol, latcol, maxloncol)
-    return loncol, latcol, gridid
+    return loncol, latcol, grid
 
 
 def GPS_to_grid(lon, lat, params):
@@ -204,8 +209,8 @@ def GPS_to_grid(lon, lat, params):
     params = convertparams(params)
     method = params['method']
     if method == 'rect':
-        loncol, latcol, gridid = GPS_to_grids_rect(lon, lat, params)
-        return [loncol, latcol, gridid]
+        loncol, latcol, grid = GPS_to_grids_rect(lon, lat, params)
+        return [loncol, latcol, grid]
     # if method == 'tri':
     #     loncol_1, loncol_2, loncol_3 = GPS_to_grids_tri(lon, lat, params)
     #     return [loncol_1, loncol_2, loncol_3]
@@ -307,7 +312,7 @@ gRenameColumns = {'名称':'name','大类':'category','中类':'class', '小类'
                     '省':'province', '市':'city', '区':'district', 'WGS84_经度':'longitude', 'WGS84_纬度':'latitude'}
 gFileterColumne = ['名称', '大类', '中类', '小类', '省', '市', '区', 'WGS84_经度', 'WGS84_纬度']
 gSelectedColumne = ['category', 'longitude', 'latitude']
-gCategoryMapNumber = {'餐饮服务':0, '商务住宅':1, '公共设施':2, '公司企业':3, '风景名胜':4, 
+gCategoryMapNumber = {'住宿服务':0, '商务住宅':1, '公共设施':2, '公司企业':3, '风景名胜':4, 
                     '金融保险服务':5, '政府机构及社会团体':6, '医疗保健服务':7, '生活服务':8, 
                     '餐饮服务':9, '科教文化服务':10, '购物服务':11, '体育休闲服务':12, '交通设施服务':13}
 
@@ -326,13 +331,19 @@ gOutpuyPath='./Data/Output/'
 gSamplingIntervalRow = 0
 # 是否独立保存每个用户的轨迹。
 gSaveUserTrajectoryFlag = False
+
+# 在处理轨迹数据时，是否将所有范围之外的经纬度都删除。
+# 1. 按照推荐系统的一般做法，会将没有出现在物品列表中的物品删除。
+# 2. 而且在没有剔除范围外的地点时会产生大量编号为负数的grid。所以最后
+# 考虑上述两个原因，先把范围之外的地点在最后生成轨迹特征时 GenerateInteractionMatrix() 删除。
+gDeleteOutofBoundTrajectoryFlag = False
         
 
 # --- 获取PoI特征 ---
 
 def GeneratePoIFeature(FilePath, fileParameters, GeoParameters, gSharedData, lock):
     """_summary_
-    生成PoI特征。
+    对单个用户进行处理，生成PoI特征。使用multiprocessing进行处理。
     Args:
         FilePath (_type_): _description_
         fileParameters (_type_): _description_
@@ -364,24 +375,29 @@ def GeneratePoIFeature(FilePath, fileParameters, GeoParameters, gSharedData, loc
     # 将特征由中文全部转化为数值。
     df['category'] = df['category'].map(CategoryMapNumber)
     # 生成区域ID。
-    _, _, df['gridID'] = GPS_to_grid(df['longitude'],df['latitude'], GeoParameters)
+    _, _, df['grid'] = GPS_to_grid(df['longitude'],df['latitude'], GeoParameters)
     # print('3')
     # 选取最终进行聚合的列。
-    df = df[['category', 'gridID']].copy()
+    df = df[['category', 'grid']].copy()
     # print(df.head(3))
     # 创建一个空列，用于在生成透视表时存储值。
     df['temp'] = 0
     # print('4')
     # print(df.head(3))
-    df = df.pivot_table(index='gridID',columns='category', values='temp', aggfunc='count').fillna(0)
+    df = df.pivot_table(index='grid',columns='category', values='temp', aggfunc='count').fillna(0)
     # print(df.head(3))
 
     with lock:
         # 按列名拼接。也就是列名相同的会自动对应，缺少的列填空值。
-        # 此时的index是gridID，后面还需要聚合操作的，所以不能忽略。
+        # 此时的index是grid，后面还需要聚合操作的，所以不能忽略。
         gSharedData.dat = pd.concat([gSharedData.dat, df]).fillna(0.0)
 
 def GetPoIFeature():
+    """_summary_
+    生成PoI特征。
+    Returns:
+        _type_: _description_
+    """
     startTime = PrintStartInfo(functionName='GetPoIFeature()')
     # 检测POI特征的路径是否存在。不存在则返回。
     if os.path.exists(gPoIFolderPath) ==False:
@@ -427,7 +443,7 @@ def GetPoIFeature():
     # 如果PoI特征文件已经存在，那么发出提示，并且之后将会覆盖。
     if os.path.exists(gPoIFeatureSavePath) == True:
         print('{} is exist, will overwrite.'.format(gPoIFeatureSavePath))
-
+    
     gSharedData.dat.to_csv(gPoIFeatureSavePath)
     PrintEndInfo(functionName='GetPoIFeature()', startTime=startTime)
 
@@ -441,9 +457,43 @@ def GetEntireTime(df):
         pd.Timestamp(datetime.datetime.strptime((df['date'] + ' ' + df['time']),'%Y-%m-%d %H:%M:%S'))
     return df
 
+def GenerateTimeFeature(df):
+    """_summary_
+    生成时间特征。。提供给pandas apply使用的。
+    Args:
+        df (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    # 生成时间特征。
+    df['weekofyear'] = df['entireTime'].dt.weekofyear
+    # 一周中的星期几。
+    df['dayofweek'] = df['entireTime'].dt.dayofweek
+    # 一年中的第几天。
+    df['dayofyear'] = df['entireTime'].dt.dayofyear
+    # 一年中的第几个季度。
+    df['quarter'] = df['entireTime'].dt.quarter
+    # SingleUserTrajectory_pd['weekday_name'] = SingleUserTrajectory_pd['entireTime'].dt.weekday_name
+    # 一年中的第几个月。
+    df['month'] = df['entireTime'].dt.month
+    # 第几年。这个没有必要。
+    # SingleUserTrajectory_pd['year'] = SingleUserTrajectory_pd['entireTime'].dt.year
+    # 一天中的第几个小时。
+    df['hour'] = df['entireTime'].dt.hour
+    df['halfhour'] = df['entireTime'].dt.floor(freq='30Min')
+    return df
+
+
 # --- 轨迹预处理 ---
 
 def PreprocessSingleTrajectoryIndependent(user):
+    """_summary_
+    对单个用户的轨迹进行处理。主要这里是输出时保存为每个用户的轨迹文件。
+    原因是，单个大的csv文件在读入pandas时对计算的性能要求比较高；所以分为每个文件可以加快处理速度。
+    Args:
+        user (_type_): _description_
+    """
     # gTrajectoryFolderPath = "./Data/Geolife Trajectories 1.3/Data/"
     userdata = gTrajectoryFolderPath + '/{}/Trajectory/'.format(user)
 
@@ -458,7 +508,9 @@ def PreprocessSingleTrajectoryIndependent(user):
 
     # 删除未使用的列
     df.drop(['zero', 'days'], axis=1, inplace=True) #drop函数默认删除行，列需要加axis = 1
-    
+    if gDeleteOutofBoundTrajectoryFlag == True:
+        # Delete out of bounds .
+        df = clean_outofbounds(df, bounds = gBounds, col = ['lng', 'lat'])
     # 准备对数据进行抽样，降低数据密度。
     df_sampling = pd.DataFrame()
     
@@ -499,14 +551,23 @@ def PreprocessSingleTrajectoryIndependent(user):
     df_sampling.rename(columns={'lat': 'latitude', 'lng': 'longitude'}, inplace=True)
 
     # 生成区域ID。
-    _, _, df_sampling['gridID'] = GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
+    _, _, df_sampling['grid'] = GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
+    df_sampling['userID'] = user
 
     if gSaveUserTrajectoryFlag == True:
         df_sampling.to_csv(gOutputProecessedTrajectory.format(user))
 
-    # return df_sampling
         
 def PreprocessSingleTrajectoryMerged(user, sharedData, lock):
+    """_summary_
+    对单个用户的轨迹进行处理。主要这里是输出时保存为所有用户的轨迹文件。也就是所有用户的轨迹保存为了一个文件。
+    保存为一个文件的优点在于，当计算机性能允许的情况下可以比较直接的做整表的逻辑运算。
+    比如在生成交互矩阵时就必须需要对所有用户同时进行计算。
+    Args:
+        user (_type_): _description_
+        sharedData (_type_): _description_
+        lock (_type_): _description_
+    """
     # gTrajectoryFolderPath = "./Data/Geolife Trajectories 1.3/Data/"
     userdata = gTrajectoryFolderPath + '/{}/Trajectory/'.format(user)
 
@@ -521,7 +582,9 @@ def PreprocessSingleTrajectoryMerged(user, sharedData, lock):
 
     # 删除未使用的列
     df.drop(['zero', 'days'], axis=1, inplace=True) #drop函数默认删除行，列需要加axis = 1
-    
+    if gDeleteOutofBoundTrajectoryFlag == True:
+        # Delete out of bounds .
+        df = clean_outofbounds(df, bounds = gBounds, col = ['lng', 'lat'])
     # 准备对数据进行抽样，降低数据密度。
     df_sampling = pd.DataFrame()
     
@@ -562,7 +625,8 @@ def PreprocessSingleTrajectoryMerged(user, sharedData, lock):
     df_sampling.rename(columns={'lat': 'latitude', 'lng': 'longitude'}, inplace=True)
 
     # 生成区域ID。
-    _, _, df_sampling['gridID'] = GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
+    _, _, df_sampling['grid'] = GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
+    df_sampling['userID'] = user
 
     if gSaveUserTrajectoryFlag == True:
         df_sampling.to_csv(gOutputProecessedTrajectory.format(user))
@@ -573,10 +637,11 @@ def PreprocessSingleTrajectoryMerged(user, sharedData, lock):
 
 
 def PreprocessTrajectory(userRange, 
-                         outputType='independent',
+                         outputType='merged',
                          userList=[]):
     """_summary_
-
+    对轨迹数据进行处理。注意相关的超参数都是以全局变量的形式存储的。
+    主要以对所有用户且保存为一个文件为主要选择项。
     Args:
         userRange (string): 有3个值可供选择：single, multi, all。
                         当range为all时，不需要用到userList。直接从TrajectoriesBasePath目录下读取所有的user轨迹。
@@ -588,14 +653,17 @@ def PreprocessTrajectory(userRange,
                         如果读取全部用户的，那么userList中会有所有用户的ID。
     """
     saveLcoation = ''
+    # 对所有用户进行处理。
     if userRange == 'all':
         userList = next(os.walk(gTrajectoryFolderPath))[1]
         saveLcoation = (gOutpuyPath + 'Trajectory_{}.csv').format(userRange)
+    # 处理输入的多个用户的轨迹。
     elif userRange == 'multi':
         if len(userList) == 0:
             print('ERROR, userRange {}, input userlist is NULL.'.format(userRange))
             return
         saveLcoation = (gOutpuyPath + 'Trajectory_{}.csv').format(userRange)
+    # 处理输入的单个用户的轨迹。
     elif userRange == 'single':
         if len(userList) == 0:
             print('ERROR, userRange {}, input userlist is NULL.'.format(userRange))
@@ -603,12 +671,13 @@ def PreprocessTrajectory(userRange,
         # user = userList[0]
         saveLcoation = (gOutpuyPath + 'Trajectory_{}_{}.csv').format(userRange, userList[0])
 
+    # 每个用户输出各自处理好的轨迹数据。
     if outputType == 'independent':
         gSaveUserTrajectoryFlag = True
 
         ProcessPool = multiprocessing.Pool()
         result = ProcessPool.map(PreprocessSingleTrajectoryIndependent, userList)
-
+    # 将所有用户的轨迹数据合并成为一个文件输出。
     elif outputType == 'merged':
         startTime = PrintStartInfo(functionName='PreprocessTrajectory')
         i = 0
@@ -638,54 +707,105 @@ def PreprocessTrajectory(userRange,
 
 # --- 合并特征 ---
 
+# 暂时外部特征只有PoI特征，后期还会有其他的特征需要处理。
 def CombineRegionFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/', 
                           FeatureSavePath='./Data/Output/Feature.csv'):
     pass
 
 # --- 将特征附着到轨迹上 ---
 
-from enum import Enum
+# 单个用户轨迹附着了特征之后的保存路径。
+gSingleUserTrajectorFeaturePath = './Data/Output/TrajectoryFeature/{}.csv'
+# 所有用户的轨迹附着了特征之后的保存路径。
+gAllUsersTrajectoryFeaturePath = './Data/Output/usersTrajectory.csv'
 
-class OutputType(Enum):
-    # 每个用户各自存储各自的轨迹特征文件。
-    DesperateTrajectory = 0
-    # 所有用户的轨迹和成为一个文件。
-    CombineTrajectory = 1
-
-    # 将所有用户的轨迹融合成为一个矩阵的文件。
-    # 这个需要很多参数。
-    TrajectoryMatrix = 2
-    # 输入用户和地域的交互矩阵。
-    InteractionMatrix = 3
+# 所有合并之后的特征。
+# gFeaturePath = './Data/Output/Feature.csv'
+# 暂时只有PoI特征。所以直接指向PoI特征。
+gFeaturePath = './Data/Output/MultipleFeatures/PoIFeature.csv'
 
 def AttachFeaturetoSingleUserTrajectory(user):
-    PoIFeature = pd.read_csv(gPoIFeatureSavePath)
-    userTrajectory = pd.read_csv(gOutputProecessedTrajectory.format(user))
+    """_summary_
+    将特征附着到单个用户的轨迹上。在multiprocessing中使用。
+    Args:
+        user (_type_): 用户ID。
+    """
+    PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
+    PoIFeature['grid'] = PoIFeature.index
+    
+    userTrajectory = pd.read_csv(gOutputProecessedTrajectory.format(user), index_col=0)
 
-    # 所有特征的列名。
-    columnName = list(gCategoryMapNumber.values())
-    columnName = columnName.append('grid')
+    userTrajectory = userTrajectory.merge(PoIFeature, 
+                                          on='grid', how='left').fillna(0)
 
-    userTrajectory = userTrajectory.merge(PoIFeature[columnName], on='grid', how='left')
-
-    userTrajectory.to_csv('./Data/Output/TrajectoryFeature/{}.csv'.format(user))
+    userTrajectory.to_csv(gSingleUserTrajectorFeaturePath.format(user))
 
 
-def AttachFeaturetoTrajectory(featurePath='', trajectoryFolderPath='', outputType='independent'):
+def AttachFeaturetoTrajectory(outputType='merged'):
+    """_summary_
+    将特征附着到所有用户的轨迹上。
+    Args:
+        outputType (str, optional): _description_. Defaults to 'merged'.
+    """
+    startTime = PrintStartInfo(functionName='AttachFeaturetoTrajectory()')
 
+    # 输出每个用户各自的附着了特征之后的轨迹。
     if outputType == 'independent':
         userList = next(os.walk(gTrajectoryFolderPath))[1]
         ProcessPool = multiprocessing.Pool()
         ProcessPool.map(AttachFeaturetoSingleUserTrajectory, userList)
+    # 输出所有用户附着了特征之后的轨迹为一个文件。
     elif outputType == 'merged':
-        usersTrajectory = pd.read_csv(gOutpuyPath + 'Trajectory_all.csv')
-        PoIFeature = pd.read_csv(gPoIFeatureSavePath)
+        usersTrajectory = pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', index_col=0)
+        PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
+        # 将index列赋值给一个新的grid列。
+        PoIFeature['grid'] = PoIFeature.index
 
-        # 所有特征的列名。
-        columnName = list(gCategoryMapNumber.values())
-        columnName = columnName.append('grid')
+        usersTrajectory = usersTrajectory.merge(PoIFeature, 
+                                                on='grid', how='left').fillna(0)
 
-        usersTrajectory = usersTrajectory.merge(PoIFeature[columnName], on='grid', how='left')
+        usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
+    PrintEndInfo(functionName='AttachFeaturetoTrajectory()', startTime=startTime)
 
-        usersTrajectory.to_csv('./Data/Output/usersTrajectory.csv')
+# --- output other format ---
+
+# 交互矩阵保存的路径。
+gInteractionMatrixSavePath = './Data/Output/InteractionMatrix.csv'
+
+def GenerateInteractionMatrix():
+    """_summary_
+    生成交互矩阵。
+    """
+    startTime = PrintStartInfo(functionName='GenerateInteractionMatrix()')
+    Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, index_col=0)
+    # 是否删除所有范围之外的地点。
+    if gDeleteOutofBoundTrajectoryFlag == True:
+        Trajectories = clean_outofbounds(Trajectories, gBounds, col=['longitude', 'latitude'])
+    # 选择最终进行透视的列。'latitude'列只是作为最后 aggfunc='count' 的存在。
+    Trajectories = Trajectories[['grid', 'userID', 'latitude']]
+    InteractionMatrix = Trajectories.pivot_table(index='userID',columns='grid', 
+                                                 values='latitude', aggfunc='count').fillna(0).copy()
+    # 保存。
+    InteractionMatrix.to_csv(gOutpuyPath + 'InteractionMatrix.csv')
+    PrintEndInfo(functionName='GenerateInteractionMatrix()', startTime=startTime)
+
+# 生成特征矩阵时需要对所有的特征进行归一化。
+from sklearn.preprocessing import MinMaxScaler
+
+def GenerateFeatureMatrix():
+    """_summary_
+    生成特征矩阵。
+    """
+    Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, index_col=0)
+    if gDeleteOutofBoundTrajectoryFlag == True:
+        Trajectories = clean_outofbounds(Trajectories, gBounds, col=['longitude', 'latitude'])
+    
+    # 需要生成时间特征。
+    Trajectories = Trajectories.apply(GenerateTimeFeature, axis=1)
+
+    # 高度信息不能丢弃，也作为一种特征。
+    # 需要判断停留点。
+    # 需要的将地点的文字描述embedding之后也作为特征保存在特征矩阵中。
+    pass
+
 
