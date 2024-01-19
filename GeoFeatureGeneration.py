@@ -27,6 +27,7 @@ import geopandas as gpd
 
 import sklearn
 
+# --- TranBigData ---
 
 def convertparams(params):
     # Convertparams from list to dict
@@ -278,6 +279,104 @@ of [lon1,lat1,lon2,lat2]. (lon1,lat1) is the lower left corner and \
     data1 = data1[(data1[Lng] > bounds[0]) & (data1[Lng] < bounds[2]) & (
         data1[Lat] > bounds[1]) & (data1[Lat] < bounds[3])]
     return data1
+
+def traj_stay_move(data, params,
+                     col=['ID', 'dataTime', 'longitude', 'latitude'],
+                     activitytime=1800):
+    '''
+    Input trajectory data and gridding parameters, identify stay and move
+
+    Parameters
+    ----------------
+    data : DataFrame
+        trajectory data
+    params : List
+        gridding parameters
+    col : List
+        The column name, in the order of ['ID','dataTime','longitude',
+        'latitude']
+    activitytime : Number
+        How much time to regard as activity
+
+    Returns
+    ----------------
+    stay : DataFrame
+        stay information
+    move : DataFrame
+        move information
+    '''
+    uid, timecol, lon, lat = col
+    # Identify stay
+    data = data.sort_values(by=col[:2])
+    stay = data.copy()
+    stay = stay.rename(columns={lon: 'lon', lat: 'lat', timecol: 'stime'})
+    stay['stime'] = pd.to_datetime(stay['stime'])
+    stay['LONCOL'], stay['LATCOL'] = GPS_to_grid(
+        stay['lon'], stay['lat'], params)
+    # Number the status
+    stay['status_id'] = ((stay['LONCOL'] != stay['LONCOL'].shift()) |
+                         (stay['LATCOL'] != stay['LATCOL'].shift()) |
+                         (stay[uid] != stay[uid].shift())).astype(int)
+    stay.loc[stay[uid] != stay[uid].shift(-1),'status_id'] = 1
+
+    stay['status_id'] = stay.groupby([uid])['status_id'].cumsum()
+    stay = stay.drop_duplicates(
+        subset=[uid, 'status_id'], keep='first').copy()
+
+    stay['etime'] = stay['stime'].shift(-1)
+    stay = stay[stay[uid] == stay[uid].shift(-1)].copy()
+    # Remove the duration shorter than given activitytime
+    stay['duration'] = (pd.to_datetime(stay['etime']) -
+                        pd.to_datetime(stay['stime'])).dt.total_seconds()
+    stay = stay[stay['duration'] >= activitytime].copy()
+    stay = stay[[uid, 'stime', 'LONCOL', 'LATCOL',
+                 'etime', 'lon', 'lat', 'duration']]
+
+    # Add the first and last two data points for each ID in the Stay dataset before conducting move detection, so that the movement patterns of individuals at the beginning and end of the study period can also be identified.
+    first_data = data.drop_duplicates(subset=[uid],keep='first').copy()
+    last_data = data.drop_duplicates(subset=[uid],keep='last').copy()
+    first_data['stime'] = first_data[timecol]
+    first_data['etime'] = first_data[timecol]
+    first_data['duration'] = 0
+    first_data['lon'] = first_data[lon]
+    first_data['lat'] = first_data[lat]
+    first_data['LONCOL'], first_data['LATCOL'] = GPS_to_grid(
+        first_data['lon'], first_data['lat'], params)
+    first_data = first_data[[uid, 'stime', 'LONCOL', 'LATCOL',
+                    'etime', 'lon', 'lat', 'duration']]
+
+    last_data['stime'] = last_data[timecol]
+    last_data['etime'] = last_data[timecol]
+    last_data['duration'] = 0
+    last_data['lon'] = last_data[lon]
+    last_data['lat'] = last_data[lat]
+    last_data['LONCOL'], last_data['LATCOL'] = GPS_to_grid(
+        last_data['lon'], last_data['lat'], params)
+    last_data = last_data[[uid, 'stime', 'LONCOL', 'LATCOL',
+                    'etime', 'lon', 'lat', 'duration']]
+    # Identify move
+    move = pd.concat([first_data,stay,last_data],axis=0).sort_values(by=[uid,'stime'])
+    move['stime_next'] = move['stime'].shift(-1)
+    move['elon'] = move['lon'].shift(-1)
+    move['elat'] = move['lat'].shift(-1)
+    move['ELONCOL'] = move['LONCOL'].shift(-1)
+    move['ELATCOL'] = move['LATCOL'].shift(-1)
+    move[uid+'_next'] = move[uid].shift(-1)
+    move = move[move[uid+'_next'] == move[uid]
+                ].drop(['stime', 'duration', uid+'_next'], axis=1)
+    move = move.rename(columns={'lon': 'slon',
+                                'lat': 'slat',
+                                'etime': 'stime',
+                                'stime_next': 'etime',
+                                'LONCOL': 'SLONCOL',
+                                'LATCOL': 'SLATCOL',
+                                })
+    move['duration'] = (
+        move['etime'] - move['stime']).dt.total_seconds()
+    
+    move['moveid'] = range(len(move))
+    stay['stayid'] = range(len(stay))
+    return stay, move
 
 
 # --- 辅助函数 --
@@ -767,7 +866,7 @@ def AttachFeaturetoTrajectory(outputType='merged'):
         usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
     PrintEndInfo(functionName='AttachFeaturetoTrajectory()', startTime=startTime)
 
-# --- output other format ---
+# --- 输出其他格式 ---
 
 # 交互矩阵保存的路径。
 gInteractionMatrixSavePath = './Data/Output/InteractionMatrix.csv'
@@ -806,6 +905,12 @@ def GenerateFeatureMatrix():
     # 高度信息不能丢弃，也作为一种特征。
     # 需要判断停留点。
     # 需要的将地点的文字描述embedding之后也作为特征保存在特征矩阵中。
+
+    # 最主要的问题是如何决定一段有含义轨迹的长度。
+    # 先使用 stay move 函数来决定一段轨迹的长度。
+
+    stay, move = traj_stay_move(Trajectories, gBounds, col=['grid', 'entireTime', 'longitude', 'latitude'])
+    
     pass
 
 
