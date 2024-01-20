@@ -332,7 +332,8 @@ def traj_stay_move(data, params,
     stay = stay[[uid, 'stime', 'LONCOL', 'LATCOL',
                  'etime', 'lon', 'lat', 'duration']]
 
-    # Add the first and last two data points for each ID in the Stay dataset before conducting move detection, so that the movement patterns of individuals at the beginning and end of the study period can also be identified.
+    # Add the first and last two data points for each ID in the Stay dataset before conducting move detection, 
+    # so that the movement patterns of individuals at the beginning and end of the study period can also be identified.
     first_data = data.drop_duplicates(subset=[uid],keep='first').copy()
     last_data = data.drop_duplicates(subset=[uid],keep='last').copy()
     first_data['stime'] = first_data[timecol]
