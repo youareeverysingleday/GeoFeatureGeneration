@@ -566,22 +566,23 @@ def GenerateTimeFeature(df):
     Returns:
         _type_: _description_
     """
+
     # 生成时间特征。
-    df['weekofyear'] = df['entireTime'].dt.weekofyear
+    df['weekofyear'] = df['entireTime'].weekofyear
     # 一周中的星期几。
-    df['dayofweek'] = df['entireTime'].dt.dayofweek
+    df['dayofweek'] = df['entireTime'].dayofweek
     # 一年中的第几天。
-    df['dayofyear'] = df['entireTime'].dt.dayofyear
+    df['dayofyear'] = df['entireTime'].dayofyear
     # 一年中的第几个季度。
-    df['quarter'] = df['entireTime'].dt.quarter
+    df['quarter'] = df['entireTime'].quarter
     # SingleUserTrajectory_pd['weekday_name'] = SingleUserTrajectory_pd['entireTime'].dt.weekday_name
     # 一年中的第几个月。
-    df['month'] = df['entireTime'].dt.month
+    df['month'] = df['entireTime'].month
     # 第几年。这个没有必要。
     # SingleUserTrajectory_pd['year'] = SingleUserTrajectory_pd['entireTime'].dt.year
     # 一天中的第几个小时。
-    df['hour'] = df['entireTime'].dt.hour
-    df['halfhour'] = df['entireTime'].dt.floor(freq='30Min')
+    df['hour'] = df['entireTime'].hour
+    # df['halfhour'] = df['entireTime'].floor(freq='30Min')
     return df
 
 
@@ -815,7 +816,7 @@ def CombineRegionFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/',
 # --- 将特征附着到轨迹上 ---
 
 # 单个用户轨迹附着了特征之后的保存路径。
-gSingleUserTrajectorFeaturePath = './Data/Output/TrajectoryFeature/{}.csv'
+gSingleUserTrajectoryFeaturePath = './Data/Output/TrajectoryFeature/{}.csv'
 # 所有用户的轨迹附着了特征之后的保存路径。
 gAllUsersTrajectoryFeaturePath = './Data/Output/usersTrajectory.csv'
 
@@ -838,7 +839,7 @@ def AttachFeaturetoSingleUserTrajectory(user):
     userTrajectory = userTrajectory.merge(PoIFeature, 
                                           on='grid', how='left').fillna(0)
 
-    userTrajectory.to_csv(gSingleUserTrajectorFeaturePath.format(user))
+    userTrajectory.to_csv(gSingleUserTrajectoryFeaturePath.format(user))
 
 
 def AttachFeaturetoTrajectory(outputType='merged'):
@@ -891,27 +892,69 @@ def GenerateInteractionMatrix():
 
 # 生成特征矩阵时需要对所有的特征进行归一化。
 from sklearn.preprocessing import MinMaxScaler
+gStaySavePath = './Data/Output/Stay.csv'
+gMoveSavePath = './Data/Output/Move.csv'
 
-def GenerateFeatureMatrix():
+gSingleUserStaySavePath = './Data/Output/Stay/{}.csv'
+gSingleUserMoveSavePath = './Data/Output/Move/{}.csv'
+
+# import dask.dataframe as dd
+
+def GenerateSingleUserFeatureMatrix(user):
+    """_summary_
+    生成单个用户的特征。在处理整个用户轨迹特征文件的时候非常耗时。所以推荐使用分别处理每个单个用户的轨迹特征。
+    Args:
+        user (_type_): _description_
+    """
+    userTrajectory = pd.read_csv(gSingleUserTrajectoryFeaturePath.format(user), 
+                                 index_col=0,
+                                 parse_dates=['entireTime'])
+    if gDeleteOutofBoundTrajectoryFlag == True:
+        userTrajectory = clean_outofbounds(userTrajectory, 
+                                         gBounds, 
+                                         col=['longitude', 'latitude'])
+    
+
+    userTrajectory = userTrajectory.apply(GenerateTimeFeature, axis=1)
+
+    stay, move = traj_stay_move(userTrajectory, 
+                                gBounds,
+                                col=['grid', 'entireTime', 'longitude', 'latitude'])
+
+    stay.to_csv(gSingleUserStaySavePath.format(user))
+    move.to_csv(gSingleUserMoveSavePath.format(user))
+    print('{} feature has completed.'.format(user))
+
+def GenerateFeatureMatrix(ProcessType = 'independent'):
     """_summary_
     生成特征矩阵。
     """
-    Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, index_col=0)
-    if gDeleteOutofBoundTrajectoryFlag == True:
-        Trajectories = clean_outofbounds(Trajectories, gBounds, col=['longitude', 'latitude'])
-    
-    # 需要生成时间特征。
-    Trajectories = Trajectories.apply(GenerateTimeFeature, axis=1)
+    startTime = PrintStartInfo('GenerateFeatureMatrix()')
+    # 对每个用户单独进行处理。
+    if ProcessType == 'independent':
+        userList = next(os.walk(gTrajectoryFolderPath))[1]
+        ProcessPool = multiprocessing.Pool()
+        ProcessPool.map(GenerateSingleUserFeatureMatrix, userList)
+    # 处理所有用户整个处于一个csv中。效率比较低。推荐使用independent模式。
+    elif ProcessType == 'merged':
+        Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
+                                index_col=0, parse_dates=['entireTime'])
+        if gDeleteOutofBoundTrajectoryFlag == True:
+            Trajectories = clean_outofbounds(Trajectories, gBounds, col=['longitude', 'latitude'])
+        
+        # 需要生成时间特征。
+        Trajectories = Trajectories.apply(GenerateTimeFeature, axis=1)
 
-    # 高度信息不能丢弃，也作为一种特征。
-    # 需要判断停留点。
-    # 需要的将地点的文字描述embedding之后也作为特征保存在特征矩阵中。
+        # 高度信息不能丢弃，也作为一种特征。
+        # 需要判断停留点。
+        # 需要的将地点的文字描述embedding之后也作为特征保存在特征矩阵中。
+        
+        # user stay and move to decide sentence length .
+        stay, move = traj_stay_move(Trajectories, 
+                                    gBounds,
+                                    col=['grid', 'entireTime', 'longitude', 'latitude'])
 
-    # 最主要的问题是如何决定一段有含义轨迹的长度。
-    # 先使用 stay move 函数来决定一段轨迹的长度。
+        stay.to_csv(gStaySavePath)
+        move.to_csv(gMoveSavePath)
 
-    stay, move = traj_stay_move(Trajectories, gBounds, col=['grid', 'entireTime', 'longitude', 'latitude'])
-    
-    pass
-
-
+    PrintEndInfo('GenerateFeatureMatrix()', startTime=startTime)

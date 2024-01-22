@@ -1,17 +1,8 @@
 
 import GeoFeatureGeneration as gfg
 
-# 步骤：
-# 1. 生成PoI特征。
-# 2. 如果有其他的特征，那么生成其他的特征。
-# 3. 合并所有特征。
-# 4. 将用户轨迹处理完成。
-# 5. 将特征与用户轨迹合并。
-# 6. 生成所需要的格式。
-
-
 if __name__ == '__main__':
-    # consume 1 minute.
+    # consume 1 minter.
     # gfg.GetPoIFeature()
 
     # consume 18:49 . 
@@ -19,9 +10,16 @@ if __name__ == '__main__':
     # gfg.PreprocessTrajectory(userRange='all', outputType='merged')
 
     # consume 5:36 .
+    # 两种模式都需要处理一次，主要时候后面最终输出为不同的格式时需要不同的数据形状。
+    # 生成交互矩阵需要使用所有用户在一个dataframe的形式。
+    # 在生成轨迹特征的时候，单独处理一个dataframe效率太低，建议使用分别处理每个用户的形式。
     # gfg.AttachFeaturetoTrajectory(outputType='independent')
     # gfg.AttachFeaturetoTrajectory(outputType='merged')
 
     # consume 1:26 .
-    gfg.gDeleteOutofBoundTrajectoryFlag = True
-    gfg.GenerateInteractionMatrix()
+    # 需要将区域外的地点都排除。
+    # gfg.gDeleteOutofBoundTrajectoryFlag = True
+    # gfg.GenerateInteractionMatrix()
+
+    # 建议使用对每个用户分别处理的形式。最后再进行合并效率比较高。
+    gfg.GenerateFeatureMatrix(ProcessType='independent')
