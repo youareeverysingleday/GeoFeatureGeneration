@@ -27,7 +27,6 @@ import geopandas as gpd
 
 import sklearn
 
-# --- TranBigData ---
 
 def convertparams(params):
     # Convertparams from list to dict
@@ -174,6 +173,7 @@ def GPS_to_grids_rect(lon, lat, params, from_origin=False):
         loncol = loncol[0]
         latcol = latcol[0]
 
+    # 添加生成grid的代码.
     grid = loncol * maxloncol + latcol
     # print(loncol, latcol, maxloncol)
     return loncol, latcol, grid
@@ -281,7 +281,7 @@ of [lon1,lat1,lon2,lat2]. (lon1,lat1) is the lower left corner and \
     return data1
 
 def traj_stay_move(data, params,
-                     col=['ID', 'dataTime', 'longitude', 'latitude'],
+                     col=['userID', 'dataTime', 'longitude', 'latitude', 'grid'],
                      activitytime=1800):
     '''
     Input trajectory data and gridding parameters, identify stay and move
@@ -293,8 +293,8 @@ def traj_stay_move(data, params,
     params : List
         gridding parameters
     col : List
-        The column name, in the order of ['ID','dataTime','longitude',
-        'latitude']
+        The column name, in the order of ['userID', 'dataTime', 
+        'longitude', 'latitude', 'grid']
     activitytime : Number
         How much time to regard as activity
 
@@ -311,11 +311,8 @@ def traj_stay_move(data, params,
     stay = data.copy()
     stay = stay.rename(columns={lon: 'lon', lat: 'lat', timecol: 'stime'})
     stay['stime'] = pd.to_datetime(stay['stime'])
-    stay['LONCOL'], stay['LATCOL'] = GPS_to_grid(
-        stay['lon'], stay['lat'], params)
     # Number the status
-    stay['status_id'] = ((stay['LONCOL'] != stay['LONCOL'].shift()) |
-                         (stay['LATCOL'] != stay['LATCOL'].shift()) |
+    stay['status_id'] = ((stay['grid'] != stay['grid'].shift()) |
                          (stay[uid] != stay[uid].shift())).astype(int)
     stay.loc[stay[uid] != stay[uid].shift(-1),'status_id'] = 1
 
@@ -329,7 +326,7 @@ def traj_stay_move(data, params,
     stay['duration'] = (pd.to_datetime(stay['etime']) -
                         pd.to_datetime(stay['stime'])).dt.total_seconds()
     stay = stay[stay['duration'] >= activitytime].copy()
-    stay = stay[[uid, 'stime', 'LONCOL', 'LATCOL',
+    stay = stay[[uid, 'stime', 'grid',
                  'etime', 'lon', 'lat', 'duration']]
 
     # Add the first and last two data points for each ID in the Stay dataset before conducting move detection, 
@@ -341,9 +338,11 @@ def traj_stay_move(data, params,
     first_data['duration'] = 0
     first_data['lon'] = first_data[lon]
     first_data['lat'] = first_data[lat]
-    first_data['LONCOL'], first_data['LATCOL'] = GPS_to_grid(
-        first_data['lon'], first_data['lat'], params)
-    first_data = first_data[[uid, 'stime', 'LONCOL', 'LATCOL',
+
+    # first_data['LONCOL'], first_data['LATCOL'] = GPS_to_grid(
+    #     first_data['lon'], first_data['lat'], params)
+    # print('6')
+    first_data = first_data[[uid, 'stime', 'grid',
                     'etime', 'lon', 'lat', 'duration']]
 
     last_data['stime'] = last_data[timecol]
@@ -351,32 +350,35 @@ def traj_stay_move(data, params,
     last_data['duration'] = 0
     last_data['lon'] = last_data[lon]
     last_data['lat'] = last_data[lat]
-    last_data['LONCOL'], last_data['LATCOL'] = GPS_to_grid(
-        last_data['lon'], last_data['lat'], params)
-    last_data = last_data[[uid, 'stime', 'LONCOL', 'LATCOL',
+    # last_data['LONCOL'], last_data['LATCOL'] = GPS_to_grid(
+    #     last_data['lon'], last_data['lat'], params)
+    last_data = last_data[[uid, 'stime', 'grid',
                     'etime', 'lon', 'lat', 'duration']]
+
     # Identify move
     move = pd.concat([first_data,stay,last_data],axis=0).sort_values(by=[uid,'stime'])
+
     move['stime_next'] = move['stime'].shift(-1)
     move['elon'] = move['lon'].shift(-1)
     move['elat'] = move['lat'].shift(-1)
-    move['ELONCOL'] = move['LONCOL'].shift(-1)
-    move['ELATCOL'] = move['LATCOL'].shift(-1)
+    move['Egrid'] = move['grid'].shift(-1)
+    # move['ELATCOL'] = move['LATCOL'].shift(-1)
     move[uid+'_next'] = move[uid].shift(-1)
+
     move = move[move[uid+'_next'] == move[uid]
                 ].drop(['stime', 'duration', uid+'_next'], axis=1)
     move = move.rename(columns={'lon': 'slon',
                                 'lat': 'slat',
                                 'etime': 'stime',
                                 'stime_next': 'etime',
-                                'LONCOL': 'SLONCOL',
-                                'LATCOL': 'SLATCOL',
+                                'grid': 'Sgrid'
                                 })
     move['duration'] = (
         move['etime'] - move['stime']).dt.total_seconds()
     
     move['moveid'] = range(len(move))
     stay['stayid'] = range(len(stay))
+
     return stay, move
 
 
@@ -417,8 +419,12 @@ gCategoryMapNumber = {'住宿服务':0, '商务住宅':1, '公共设施':2, '公
                     '餐饮服务':9, '科教文化服务':10, '购物服务':11, '体育休闲服务':12, '交通设施服务':13}
 
 
+
+
 # 轨迹数据的存储目录。
 gTrajectoryFolderPath = "./Data/Geolife Trajectories 1.3/Data/"
+
+gUserList = next(os.walk(gTrajectoryFolderPath))[1]
 # InputTrajectoryCsvSavePath = './Data/Output/Trajectories/{}.csv'
 # 单个用户的保存目录。
 gOutputProecessedTrajectory='./Data/Output/ProcessedTrajectories/{}.csv'
@@ -756,7 +762,7 @@ def PreprocessTrajectory(userRange,
     saveLcoation = ''
     # 对所有用户进行处理。
     if userRange == 'all':
-        userList = next(os.walk(gTrajectoryFolderPath))[1]
+        userList = gUserList
         saveLcoation = (gOutpuyPath + 'Trajectory_{}.csv').format(userRange)
     # 处理输入的多个用户的轨迹。
     elif userRange == 'multi':
@@ -852,7 +858,7 @@ def AttachFeaturetoTrajectory(outputType='merged'):
 
     # 输出每个用户各自的附着了特征之后的轨迹。
     if outputType == 'independent':
-        userList = next(os.walk(gTrajectoryFolderPath))[1]
+        userList = gUserList
         ProcessPool = multiprocessing.Pool()
         ProcessPool.map(AttachFeaturetoSingleUserTrajectory, userList)
     # 输出所有用户附着了特征之后的轨迹为一个文件。
@@ -918,8 +924,8 @@ def GenerateSingleUserFeatureMatrix(user):
     userTrajectory = userTrajectory.apply(GenerateTimeFeature, axis=1)
 
     stay, move = traj_stay_move(userTrajectory, 
-                                gBounds,
-                                col=['grid', 'entireTime', 'longitude', 'latitude'])
+                                gGeoParameters,
+                                col=['userID', 'entireTime', 'longitude', 'latitude'])
 
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
@@ -932,7 +938,7 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
     startTime = PrintStartInfo('GenerateFeatureMatrix()')
     # 对每个用户单独进行处理。
     if ProcessType == 'independent':
-        userList = next(os.walk(gTrajectoryFolderPath))[1]
+        userList = gUserList
         ProcessPool = multiprocessing.Pool()
         ProcessPool.map(GenerateSingleUserFeatureMatrix, userList)
     # 处理所有用户整个处于一个csv中。效率比较低。推荐使用independent模式。
@@ -951,8 +957,8 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
         
         # user stay and move to decide sentence length .
         stay, move = traj_stay_move(Trajectories, 
-                                    gBounds,
-                                    col=['grid', 'entireTime', 'longitude', 'latitude'])
+                                    gGeoParameters,
+                                    col=['userID', 'entireTime', 'longitude', 'latitude'])
 
         stay.to_csv(gStaySavePath)
         move.to_csv(gMoveSavePath)
