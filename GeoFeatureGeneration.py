@@ -305,7 +305,7 @@ def traj_stay_move(data, params,
     move : DataFrame
         move information
     '''
-    uid, timecol, lon, lat = col
+    uid, timecol, lon, lat, grid = col
     # Identify stay
     data = data.sort_values(by=col[:2])
     stay = data.copy()
@@ -382,20 +382,51 @@ def traj_stay_move(data, params,
     return stay, move
 
 
+def OneDayMatrix(stay, 
+                 col=['stime', 'grid', 'duration'],
+                 interval='D'):
+    data = stay.copy()
+    data['jtime'] = data['stime'].shift(-1)
+
+    
+
+    if interval == 'D':
+        
+
+        pass
+    elif interval == 'W':
+        pass
+    elif interval == 'M':
+        pass
+    elif interval == 'Q':
+        pass
+    elif interval == 'Y':
+        pass
+
+    
+    data['judageTime'] = data['stime'].shift(-1)
+    
+    pass
+
+
+
+
 # --- 辅助函数 --
 
 def PrintStartInfo(functionName, description=''):
     startTime = datetime.datetime.now()
-    print('Start function: {} ,\n  pid: {} ,\n  start at: {} .'.format(functionName, os.getpid(), startTime.strftime('%Y-%m-%d %H:%M:%S')))
+    print('Start function: {} ,\n  pid: {} ,\n  start at: {} .'.
+          format(functionName, os.getpid(), startTime.strftime('%Y-%m-%d %H:%M:%S')))
     if description != '':
         print(description)
     
     return startTime
 
 def PrintEndInfo(functionName, startTime, description=''):
-    print('End function: {} ,\n  pid: {} ,\n  completed time: {} ,\n  consume time: {} .'.format(functionName, os.getpid(), 
-                                                                                    datetime.datetime.now(), 
-                                                                                    datetime.datetime.now() - startTime))
+    print('End function: {} ,\n  pid: {} ,\n  completed time: {} ,\n  \
+          consume time: {} .'.format(functionName, os.getpid(),
+                                     datetime.datetime.now(), 
+                                     datetime.datetime.now() - startTime))
     if description != '':
         print(description)
 
@@ -906,7 +937,7 @@ gSingleUserMoveSavePath = './Data/Output/Move/{}.csv'
 
 # import dask.dataframe as dd
 
-def GenerateSingleUserFeatureMatrix(user):
+def GenerateSingleUserFeatureSeries(user):
     """_summary_
     生成单个用户的特征。在处理整个用户轨迹特征文件的时候非常耗时。所以推荐使用分别处理每个单个用户的轨迹特征。
     Args:
@@ -929,6 +960,27 @@ def GenerateSingleUserFeatureMatrix(user):
 
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
+
+
+
+    print('{} feature has completed.'.format(user))
+
+gSingleUserStayMatrixSavePath = './Data/Output/StayMatrx/{}.csv'
+
+
+def GenerateSingleUserFeatureMatrix(user):
+    userSeries = pd.read_csv(gSingleUserStaySavePath.format(user), 
+                                 index_col=0,
+                                 parse_dates=['entireTime'])
+    
+
+    stay, move = traj_stay_move(userSeries, 
+                                gGeoParameters,
+                                col=['userID', 'entireTime', 'longitude', 'latitude'])
+
+    stay.to_csv(gSingleUserStaySavePath.format(user))
+    move.to_csv(gSingleUserMoveSavePath.format(user))
+
     print('{} feature has completed.'.format(user))
 
 def GenerateFeatureMatrix(ProcessType = 'independent'):
@@ -940,7 +992,7 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
     if ProcessType == 'independent':
         userList = gUserList
         ProcessPool = multiprocessing.Pool()
-        ProcessPool.map(GenerateSingleUserFeatureMatrix, userList)
+        ProcessPool.map(GenerateSingleUserFeatureSeries, userList)
     # 处理所有用户整个处于一个csv中。效率比较低。推荐使用independent模式。
     elif ProcessType == 'merged':
         Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
@@ -962,5 +1014,8 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
 
         stay.to_csv(gStaySavePath)
         move.to_csv(gMoveSavePath)
+
+
+
 
     PrintEndInfo('GenerateFeatureMatrix()', startTime=startTime)
