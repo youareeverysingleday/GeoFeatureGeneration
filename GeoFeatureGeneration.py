@@ -967,8 +967,30 @@ def GenerateSingleUserFeatureSeries(user):
 
 gSingleUserStayMatrixSavePath = './Data/Output/StayMatrx/{}.csv'
 
+def np_3d_to_csv(data, 
+                 path, 
+                 datatype='float'):
+    import csv
+    a2d = data.reshape(data.shape[0], -1)
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(a2d)
 
-def GenerateSingleUserFeatureMatrix(user):
+def np_3d_read_csv(path='./Data/Output/StayMatrx/{}.csv',
+                   shape=(-1, 128, 3),
+                   datatype='float'):
+    import csv
+    # 从csv文件读取2D数组
+    with open(path, "r") as f:
+        reader = csv.reader(f)
+        a2d = np.array(list(reader)).astype(datatype)
+
+    # 将2D数组转换为3D数组
+    a = a2d.reshape(shape)
+    print(a.shape)
+
+
+def GenerateSingleUserFeatureMatrix(user, interval='M', maxrow=128):
     userSeries = pd.read_csv(gSingleUserStaySavePath.format(user), 
                                  index_col=0,
                                  parse_dates=['entireTime'])
@@ -980,6 +1002,40 @@ def GenerateSingleUserFeatureMatrix(user):
 
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
+    
+    stay['stimestamp'] = stay['stime'].astype('int64') // 1e9
+    # stay.head()
+
+    s1 = stay.groupby(pd.Grouper(key='stime', freq=interval))
+    result = np.empty((0, maxrow, 3))
+    
+    for g in s1:
+        # 取月份值。
+        key = g[0].month
+        # print(type(key))
+        # .to_list()
+        # 取3个特征量。
+        value = g[1][['grid', 'stimestamp', 'duration']].values
+        
+        # value.dropna(axis=0, how='all', inplace=True)
+        # 将全为0的行删除。
+        value = value[value.sum(axis=1)!=0,:]
+        # 如果行数为0，也就是说没有轨迹点。那么就跳过。
+        if value.shape[0] == 0:
+            continue
+        
+        # 将轨迹填充为相同的形状。
+        # 对于大于设置超参数的行数（2维时的行数），也就是interval下的最多stay数量，处理方式需要另外实现。
+        if value.shape[0] > maxrow:
+            continue
+        else:
+            # 将不足interval下最多stay数量的矩阵填充为maxrow（2维时的行数）的数值。
+            value = np.pad(array=value, pad_width=((0,maxrow-value.shape[0]),(0,0)), mode='constant')
+        # 将单个用户的所有interval下的轨迹组合起来。合并之后的结果是一个三维矩阵。
+        result = np.concatenate((result, value[np.newaxis,:]), axis=0)
+    
+    # 保存。
+    np_3d_to_csv(result, gSingleUserStayMatrixSavePath.format(user))
 
     print('{} feature has completed.'.format(user))
 
