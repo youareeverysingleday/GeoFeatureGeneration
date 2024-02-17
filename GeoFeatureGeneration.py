@@ -963,9 +963,12 @@ gSingleUserMoveSavePath = './Data/Output/Move/{}.csv'
 
 # import dask.dataframe as dd
 
-def SeriesToMatrix(user, data, feature, interval='M', maxrow=128):
+def SeriesToMatrix(user, data, feature, interval='M', maxrow=128, 
+                   columns=['grid', 'stimestamp', 'duration', 'weekofyear', 
+                            'dayofweek', 'dayofyear', 'quarter', 'month', 'hour']):
     
     stay = data.copy()
+    # 获得时间戳。
     stay['stimestamp'] = stay['stime'].astype('int64') // 1e9
     # stay.head()
 
@@ -979,20 +982,20 @@ def SeriesToMatrix(user, data, feature, interval='M', maxrow=128):
         
         # 取3个特征量。
         # 注意g[1][['grid', 'stimestamp', 'duration']]是dataframe类型。
-        f1 = g[1][['grid', 'stimestamp', 'duration']]
+        # f1 = g[1][columns]
         # 删除全为零的行。
-        f1 = drop_all_0_rows(f1)
+        # f1 = drop_all_0_rows(f1)
         # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-        f2 = f1.join(feature.set_index('grid'), on='grid')
-        # value = g[1][['grid', 'stimestamp', 'duration']].values
+        # f2 = f1.join(feature.set_index('grid'), on='grid')
+        value = g[1][columns].values
         # 因为需要由2维矩阵变为3维矩阵，所有需要变为numpy.narray类型。
-        value = f2.values
+        # value = f2.values
         
         # 之前再f1的时候已经处理了。这里就不再继续处理了。
         # 删除全为NaN的行。
         # value.dropna(axis=0, how='all', inplace=True)
         # 将全为0的行删除。
-        # value = value[value.sum(axis=1)!=0,:]
+        value = value[value.sum(axis=1)!=0,:]
         
         # 如果行数为0，也就是说没有轨迹点。那么就跳过。
         if value.shape[0] == 0:
@@ -1020,15 +1023,21 @@ def GenerateSingleUserFeatureSeries(user):
     Args:
         user (_type_): _description_
     """
+    # 读取轨迹。
     userTrajectory = pd.read_csv(gSingleUserTrajectoryFeaturePath.format(user), 
                                  index_col=0,
                                  parse_dates=['entireTime'])
+    # 读取所有特征。
+    PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
+    PoIFeature['grid'] = PoIFeature.index
+    
+    # 去掉范围之外的轨迹。
     if gDeleteOutofBoundTrajectoryFlag == True:
         userTrajectory = clean_outofbounds(userTrajectory, 
                                          gBounds, 
                                          col=['longitude', 'latitude'])
     
-
+    # 生成时间特征。时间戳的特征也会在后面获取。
     userTrajectory = userTrajectory.apply(GenerateTimeFeature, axis=1)
 
     stay, move = traj_stay_move(userTrajectory, 
@@ -1037,6 +1046,9 @@ def GenerateSingleUserFeatureSeries(user):
 
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
+    
+    # 将通过PoI获得的特征以及其他特征和停留点特征合并。
+    stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
 
     SeriesToMatrix(user=user, data=stay, interval='M', maxrow=128)
 
