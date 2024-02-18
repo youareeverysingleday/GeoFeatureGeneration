@@ -594,7 +594,7 @@ def GetEntireTime(df):
         pd.Timestamp(datetime.datetime.strptime((df['date'] + ' ' + df['time']),'%Y-%m-%d %H:%M:%S'))
     return df
 
-def GenerateTimeFeature(df):
+def GenerateTimeFeature(df, col='entireTime'):
     """_summary_
     生成时间特征。。提供给pandas apply使用的。
     Args:
@@ -605,20 +605,20 @@ def GenerateTimeFeature(df):
     """
 
     # 生成时间特征。
-    df['weekofyear'] = df['entireTime'].weekofyear
+    df['weekofyear'] = df[col].weekofyear
     # 一周中的星期几。
-    df['dayofweek'] = df['entireTime'].dayofweek
+    df['dayofweek'] = df[col].dayofweek
     # 一年中的第几天。
-    df['dayofyear'] = df['entireTime'].dayofyear
+    df['dayofyear'] = df[col].dayofyear
     # 一年中的第几个季度。
-    df['quarter'] = df['entireTime'].quarter
+    df['quarter'] = df[col].quarter
     # SingleUserTrajectory_pd['weekday_name'] = SingleUserTrajectory_pd['entireTime'].dt.weekday_name
     # 一年中的第几个月。
-    df['month'] = df['entireTime'].month
+    df['month'] = df[col].month
     # 第几年。这个没有必要。
     # SingleUserTrajectory_pd['year'] = SingleUserTrajectory_pd['entireTime'].dt.year
     # 一天中的第几个小时。
-    df['hour'] = df['entireTime'].hour
+    df['hour'] = df[col].hour
     # df['halfhour'] = df['entireTime'].floor(freq='30Min')
     return df
 
@@ -927,6 +927,7 @@ def GenerateInteractionMatrix():
     InteractionMatrix.to_csv(gOutpuyPath + 'InteractionMatrix.csv')
     PrintEndInfo(functionName='GenerateInteractionMatrix()', startTime=startTime)
 
+# 将numpy.narray的3维数据保存为csv格式。
 def np_3d_to_csv(data, 
                  path, 
                  datatype='float'):
@@ -936,6 +937,7 @@ def np_3d_to_csv(data,
         writer = csv.writer(f)
         writer.writerows(a2d)
 
+# 从3维数据中读取numpy.narray格式。
 def np_3d_read_csv(path='./Data/Output/StayMatrx/{}.csv',
                    shape=(-1, 128, 3),
                    datatype='float'):
@@ -963,44 +965,53 @@ gSingleUserMoveSavePath = './Data/Output/Move/{}.csv'
 
 # import dask.dataframe as dd
 
-def SeriesToMatrix(user, data, feature, interval='M', maxrow=128, 
-                   columns=['grid', 'stimestamp', 'duration', 'weekofyear', 
-                            'dayofweek', 'dayofyear', 'quarter', 'month', 'hour']):
+def SeriesToMatrix(user, data, interval='M', maxrow=128):
+    """_summary_
+    将轨迹的序列形式转换为矩阵形式。
+    传入转换之间必须将特征全部附着到轨迹上。
+    Args:
+        user (int): 用户ID
+        data (pandas.DataFrame): 已经融合了特征的轨迹序列。
+        interval (str, optional): 提取停留点的周期. Defaults to 'M'.
+        maxrow (int, optional): _description_. Defaults to 128.
+
+    Returns:
+        numpy.narray : 返回numpy.narray同时，也保存为了csv格式。
+    """
     
     stay = data.copy()
+    # print(stay.head(2))
+    # print(stay.columns)
     # 获得时间戳。
     stay['stimestamp'] = stay['stime'].astype('int64') // 1e9
     # stay.head()
 
-    s1 = stay.groupby(pd.Grouper(key='stime', freq=interval))
-    result = np.empty((0, maxrow, 3))
+    stayGroup = stay.groupby(pd.Grouper(key='stime', freq=interval))
+    # 创建一个空的result矩阵。
+    result = np.empty((0, maxrow, stay.shape[1]))
     
-    for g in s1:
+    for g in stayGroup:
         # 取月份值。
         key = g[0].month
         # print(type(key))
         
-        # 取3个特征量。
-        # 注意g[1][['grid', 'stimestamp', 'duration']]是dataframe类型。
-        # f1 = g[1][columns]
+        # 取所有特征量。
+        # 之所以需要copy一次是因为
+        df = g[1].copy()
         # 删除全为零的行。
-        # f1 = drop_all_0_rows(f1)
-        # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-        # f2 = f1.join(feature.set_index('grid'), on='grid')
-        value = g[1][columns].values
+        df  = drop_all_0_rows(df)
+
+        value = df.values
         # 因为需要由2维矩阵变为3维矩阵，所有需要变为numpy.narray类型。
         # value = f2.values
         
         # 之前再f1的时候已经处理了。这里就不再继续处理了。
         # 删除全为NaN的行。
         # value.dropna(axis=0, how='all', inplace=True)
-        # 将全为0的行删除。
-        value = value[value.sum(axis=1)!=0,:]
-        
+
         # 如果行数为0，也就是说没有轨迹点。那么就跳过。
         if value.shape[0] == 0:
             continue
-        
         # 将轨迹填充为相同的形状。
         # 对于大于设置超参数的行数（2维时的行数），也就是interval下的最多stay数量，处理方式需要另外实现。
         if value.shape[0] > maxrow:
@@ -1008,16 +1019,22 @@ def SeriesToMatrix(user, data, feature, interval='M', maxrow=128,
         else:
             # 将不足interval下最多stay数量的矩阵填充为maxrow（2维时的行数）的数值。
             value = np.pad(array=value, pad_width=((0,maxrow-value.shape[0]),(0,0)), mode='constant')
+
         # 将单个用户的所有interval下的轨迹组合起来。合并之后的结果是一个三维矩阵。
         result = np.concatenate((result, value[np.newaxis,:]), axis=0)
     
-    # 保存。
-    np_3d_to_csv(result, gSingleUserStayMatrixSavePath.format(user))
+    print(result.shape)
+    if result.shape[0] == 0:
+        # 178 user trajectory is 0.
+        print('------{} shape is zero.'.format(user))
+    else:
+        # 保存。
+        np_3d_to_csv(result, gSingleUserStayMatrixSavePath.format(user))
 
-    print('{} feature has completed.'.format(user))
+    print('{} SeriesToMatrix have completed.'.format(user))
     return result
 
-def GenerateSingleUserFeatureSeries(user):
+def GenerateSingleUserStayMove(user):
     """_summary_
     生成单个用户的特征。在处理整个用户轨迹特征文件的时候非常耗时。所以推荐使用分别处理每个单个用户的轨迹特征。
     Args:
@@ -1027,9 +1044,7 @@ def GenerateSingleUserFeatureSeries(user):
     userTrajectory = pd.read_csv(gSingleUserTrajectoryFeaturePath.format(user), 
                                  index_col=0,
                                  parse_dates=['entireTime'])
-    # 读取所有特征。
-    PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
-    PoIFeature['grid'] = PoIFeature.index
+    
     
     # 去掉范围之外的轨迹。
     if gDeleteOutofBoundTrajectoryFlag == True:
@@ -1046,76 +1061,22 @@ def GenerateSingleUserFeatureSeries(user):
 
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
-    
-    # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-    stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
-
-    SeriesToMatrix(user=user, data=stay, interval='M', maxrow=128)
 
     print('{} feature has completed.'.format(user))
 
-gSingleUserStayMatrixSavePath = './Data/Output/StayMatrx/{}.csv'
+gSingleUserStayMatrixSavePath = './Data/Output/StayMatrix/{}.csv'
 
 
-# def GenerateSingleUserFeatureMatrix(user, interval='M', maxrow=128):
-#     userSeries = pd.read_csv(gSingleUserStaySavePath.format(user), 
-#                                  index_col=0,
-#                                  parse_dates=['entireTime'])
-    
-
-#     stay, move = traj_stay_move(userSeries, 
-#                                 gGeoParameters,
-#                                 col=['userID', 'entireTime', 'longitude', 'latitude'])
-
-#     stay.to_csv(gSingleUserStaySavePath.format(user))
-#     move.to_csv(gSingleUserMoveSavePath.format(user))
-    
-#     stay['stimestamp'] = stay['stime'].astype('int64') // 1e9
-#     # stay.head()
-
-#     s1 = stay.groupby(pd.Grouper(key='stime', freq=interval))
-#     result = np.empty((0, maxrow, 3))
-    
-#     for g in s1:
-#         # 取月份值。
-#         key = g[0].month
-#         # print(type(key))
-#         # .to_list()
-#         # 取3个特征量。
-#         value = g[1][['grid', 'stimestamp', 'duration']].values
-        
-#         # value.dropna(axis=0, how='all', inplace=True)
-#         # 将全为0的行删除。
-#         value = value[value.sum(axis=1)!=0,:]
-#         # 如果行数为0，也就是说没有轨迹点。那么就跳过。
-#         if value.shape[0] == 0:
-#             continue
-        
-#         # 将轨迹填充为相同的形状。
-#         # 对于大于设置超参数的行数（2维时的行数），也就是interval下的最多stay数量，处理方式需要另外实现。
-#         if value.shape[0] > maxrow:
-#             continue
-#         else:
-#             # 将不足interval下最多stay数量的矩阵填充为maxrow（2维时的行数）的数值。
-#             value = np.pad(array=value, pad_width=((0,maxrow-value.shape[0]),(0,0)), mode='constant')
-#         # 将单个用户的所有interval下的轨迹组合起来。合并之后的结果是一个三维矩阵。
-#         result = np.concatenate((result, value[np.newaxis,:]), axis=0)
-    
-#     # 保存。
-#     np_3d_to_csv(result, gSingleUserStayMatrixSavePath.format(user))
-
-#     print('{} feature has completed.'.format(user))
-
-def GenerateFeatureMatrix(ProcessType = 'independent'):
+def GenerateStayMove(ProcessType = 'independent'):
     """_summary_
     生成特征矩阵。
     """
-    startTime = PrintStartInfo('GenerateFeatureMatrix()')
+    startTime = PrintStartInfo('GenerateStayMove()')
     # 对每个用户单独进行处理。
     if ProcessType == 'independent':
         userList = gUserList
         ProcessPool = multiprocessing.Pool()
-        ProcessPool.map(GenerateSingleUserFeatureSeries, userList)
+        ProcessPool.map(GenerateSingleUserStayMove, userList)
     # 处理所有用户整个处于一个csv中。效率比较低。推荐使用independent模式。
     elif ProcessType == 'merged':
         Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
@@ -1138,7 +1099,31 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
         stay.to_csv(gStaySavePath)
         move.to_csv(gMoveSavePath)
 
+    PrintEndInfo('GenerateStayMove()', startTime=startTime)
 
+def GenerateSingleUserFeatureMatrix(user):
+    # 读取所有特征。
+    PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
+    PoIFeature['grid'] = PoIFeature.index
 
+    stay = pd.read_csv(gSingleUserStaySavePath.format(user), index_col=0)
+    stay['stime'] = pd.to_datetime(stay['stime'])
+
+    # 将通过PoI获得的特征以及其他特征和停留点特征合并。
+    stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+
+    SeriesToMatrix(user=user, data=stay, interval='M', maxrow=128)
+
+def GenerateFeatureMatrix(ProcessType = 'independent'):
+    startTime = PrintStartInfo('GenerateFeatureMatrix()')
+    # 对每个用户单独进行处理。
+    if ProcessType == 'independent':
+        userList = gUserList
+        ProcessPool = multiprocessing.Pool()
+        ProcessPool.map(GenerateSingleUserFeatureMatrix, userList)
+    elif ProcessType == 'merged':
+        pass
 
     PrintEndInfo('GenerateFeatureMatrix()', startTime=startTime)
+
+    

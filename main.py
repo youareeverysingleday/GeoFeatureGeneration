@@ -24,5 +24,7 @@ if __name__ == '__main__':
     # consume 2:24:26 .
     # 建议使用对每个用户分别处理的形式。最后再进行合并效率比较高。
     # test gfg.gUserList = ['079', '047']
-    gfg.gDeleteOutofBoundTrajectoryFlag = True
+    # gfg.gDeleteOutofBoundTrajectoryFlag = True
+    # gfg.GenerateStayMove(ProcessType='independent')
+
     gfg.GenerateFeatureMatrix(ProcessType='independent')
