@@ -950,6 +950,7 @@ def np_3d_read_csv(path='./Data/Output/StayMatrx/{}.csv',
     # 将2D数组转换为3D数组
     a = a2d.reshape(shape)
     print(a.shape)
+    return a
 
 # 删除全为零的行。
 def drop_all_0_rows(df):
@@ -963,9 +964,10 @@ gMoveSavePath = './Data/Output/Move.csv'
 gSingleUserStaySavePath = './Data/Output/Stay/{}.csv'
 gSingleUserMoveSavePath = './Data/Output/Move/{}.csv'
 
-# import dask.dataframe as dd
+gMaxRow = 128
 
-def SeriesToMatrix(user, data, interval='M', maxrow=128):
+def SeriesToMatrix(user, data, interval='M', maxrow=128,
+                   dropColunms=['stime', 'etime', 'stayid', 'lon', 'lat']):
     """_summary_
     将轨迹的序列形式转换为矩阵形式。
     传入转换之间必须将特征全部附着到轨迹上。
@@ -982,13 +984,18 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128):
     stay = data.copy()
     # print(stay.head(2))
     # print(stay.columns)
+
     # 获得时间戳。
     stay['stimestamp'] = stay['stime'].astype('int64') // 1e9
     # stay.head()
 
     stayGroup = stay.groupby(pd.Grouper(key='stime', freq=interval))
+
+    FeatureThirdDimension = stay.shape[1] - len(dropColunms)
     # 创建一个空的result矩阵。
-    result = np.empty((0, maxrow, stay.shape[1]))
+    result = np.empty((0, maxrow, FeatureThirdDimension))
+
+    # print((0, maxrow, FeatureThirdDimension))
     
     for g in stayGroup:
         # 取月份值。
@@ -998,6 +1005,8 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128):
         # 取所有特征量。
         # 之所以需要copy一次是因为
         df = g[1].copy()
+        # delete unneccessary columns.
+        df.drop(dropColunms, axis=1, inplace=True)
         # 删除全为零的行。
         df  = drop_all_0_rows(df)
 
@@ -1023,7 +1032,8 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128):
         # 将单个用户的所有interval下的轨迹组合起来。合并之后的结果是一个三维矩阵。
         result = np.concatenate((result, value[np.newaxis,:]), axis=0)
     
-    print(result.shape)
+    # print(result.shape)
+
     if result.shape[0] == 0:
         # 178 user trajectory is 0.
         print('------{} shape is zero.'.format(user))
@@ -1065,7 +1075,6 @@ def GenerateSingleUserStayMove(user):
     print('{} feature has completed.'.format(user))
 
 gSingleUserStayMatrixSavePath = './Data/Output/StayMatrix/{}.csv'
-
 
 def GenerateStayMove(ProcessType = 'independent'):
     """_summary_
@@ -1114,6 +1123,7 @@ def GenerateSingleUserFeatureMatrix(user):
 
     SeriesToMatrix(user=user, data=stay, interval='M', maxrow=128)
 
+
 def GenerateFeatureMatrix(ProcessType = 'independent'):
     startTime = PrintStartInfo('GenerateFeatureMatrix()')
     # 对每个用户单独进行处理。
@@ -1123,7 +1133,31 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
         ProcessPool.map(GenerateSingleUserFeatureMatrix, userList)
     elif ProcessType == 'merged':
         pass
-
     PrintEndInfo('GenerateFeatureMatrix()', startTime=startTime)
 
+gAllUsersTrajectoriesFeatureMatrixSavePath = './Data/Output/AllUsersTrajectoriesFeature.csv'
+
+def CombineUsersMatrix(dropColunms=['stime', 'etime', 'stayid', 'lon', 'lat']):
+
+    stay = pd.read_csv(gSingleUserStaySavePath.format(gUserList[0]), index_col=0)
+    # FeatureThirdDimension = stay.shape[1] - len(dropColunms)
+    FeatureThirdDimension = 18
+    FeatureShape = (-1, gMaxRow, FeatureThirdDimension)
+    # print('CombineUsersMatrix start. FeatureShape is {}'.format(FeatureShape))
+    # 所有用户的轨迹特征存储。
+    AllUsersTrajectoriesFeature = np.empty((0, gMaxRow, FeatureThirdDimension))
+
+    for user in gUserList:
+        # 如果所有用户中有些用户的轨迹并没有生成，就需要跳过。
+        if os.path.exists(gSingleUserStayMatrixSavePath.format(user)) == False:
+            continue
+
+        userFeature = np_3d_read_csv(gSingleUserStayMatrixSavePath.format(user), shape=FeatureShape)
+        # print(userFeature.shape)
+        # print(AllUsersTrajectoriesFeature.shape)
+        AllUsersTrajectoriesFeature = np.concatenate((AllUsersTrajectoriesFeature, userFeature), axis=0)
+
+    np_3d_to_csv(AllUsersTrajectoriesFeature, gAllUsersTrajectoriesFeatureMatrixSavePath)
     
+    print('CombineUsersMatrix has completed.')
+    return AllUsersTrajectoriesFeature 

@@ -27,4 +27,6 @@ if __name__ == '__main__':
     # gfg.gDeleteOutofBoundTrajectoryFlag = True
     # gfg.GenerateStayMove(ProcessType='independent')
 
-    gfg.GenerateFeatureMatrix(ProcessType='independent')
+    # gfg.GenerateFeatureMatrix(ProcessType='independent')
+
+    gfg.CombineUsersMatrix()
