@@ -106,6 +106,9 @@ class GeoFeatureGeneration:
         # 将所有单个用户的轨迹特征合并成为一个矩阵之后的保存路径。
         self.gAllUsersTrajectoriesFeatureMatrixSavePath = './Data/Output/AllUsersTrajectoriesFeature.csv'
 
+        # 计算停留点时的时间阈值。单位秒。
+        self.gActivitytime = 1800
+
 
     def convertparams(self, params):
         # Convertparams from list to dict
@@ -931,7 +934,6 @@ class GeoFeatureGeneration:
         """
         return df.drop(index=df[(df == 0).all(axis=1)].index)
 
-    
     def SeriesToMatrix(self, user, data, interval='M', maxrow=128,
                     dropColunms=['stime', 'etime', 'stayid', 'lon', 'lat']):
         """_summary_
@@ -1098,9 +1100,9 @@ class GeoFeatureGeneration:
 
     def GenerateFeatureMatrix(self, ProcessType = 'independent'):
         """_summary_
-
+        生成用户的轨迹特征矩阵。
         Args:
-            ProcessType (str, optional): _description_. Defaults to 'independent'.
+            ProcessType (str, optional): 处理的类型，是每个用户分别处理，还是处理单个数据. Defaults to 'independent'.
         """
         startTime = self.PrintStartInfo('GenerateFeatureMatrix()')
         # 对每个用户单独进行处理。
@@ -1112,25 +1114,20 @@ class GeoFeatureGeneration:
             pass
         self.PrintEndInfo('GenerateFeatureMatrix()', startTime=startTime)
 
-    
-
-    def CombineUsersMatrix(self, dropColunms=['stime', 'etime', 'stayid', 'lon', 'lat']):
+    def CombineUsersMatrix(self):
         """_summary_
-
-        Args:
-            dropColunms (list, optional): _description_. Defaults to ['stime', 'etime', 'stayid', 'lon', 'lat'].
+        将所有单个用户的轨迹特征矩阵合并为一个特征矩阵。
 
         Returns:
-            _type_: _description_
+            numpy.narray: 合并之后的单个数据。并且保存了一份在AllUsersTrajectoriesFeature路径下。
         """
 
-        stay = pd.read_csv(self.gSingleUserStaySavePath.format(self.gUserList[0]), index_col=0)
+        # stay = pd.read_csv(self.gSingleUserStaySavePath.format(self.gUserList[0]), index_col=0)
         # FeatureThirdDimension = stay.shape[1] - len(dropColunms)
-        FeatureThirdDimension = 18
-        FeatureShape = (-1, self.gMaxRow, FeatureThirdDimension)
+        FeatureShape = (-1, self.gMaxRow, self.gFeatureThirdDimension)
         # print('CombineUsersMatrix start. FeatureShape is {}'.format(FeatureShape))
         # 所有用户的轨迹特征存储。
-        AllUsersTrajectoriesFeature = np.empty((0, self.gMaxRow, FeatureThirdDimension))
+        AllUsersTrajectoriesFeature = np.empty((0, self.gMaxRow, self.gFeatureThirdDimension))
 
         for user in self.gUserList:
             # 如果所有用户中有些用户的轨迹并没有生成，就需要跳过。

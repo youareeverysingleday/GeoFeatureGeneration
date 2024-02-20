@@ -919,7 +919,7 @@ def np_3d_read_csv(path='./Data/Output/StayMatrx/{}.csv',
 
     # 将2D数组转换为3D数组
     a = a2d.reshape(shape)
-    print(a.shape)
+    # print(a.shape)
     return a
 
 # 删除全为零的行。
@@ -1012,7 +1012,7 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128,
         np_3d_to_csv(result, gSingleUserStayMatrixSavePath.format(user))
 
     print('{} SeriesToMatrix have completed.'.format(user))
-    return result
+    return result, FeatureThirdDimension
 
 def GenerateSingleUserStayMove(user):
     """_summary_
@@ -1080,7 +1080,7 @@ def GenerateStayMove(ProcessType = 'independent'):
 
     PrintEndInfo('GenerateStayMove()', startTime=startTime)
 
-def GenerateSingleUserFeatureMatrix(user):
+def GenerateSingleUserFeatureMatrix(user, shareData, lock):
     # 读取所有特征。
     PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
     PoIFeature['grid'] = PoIFeature.index
@@ -1090,9 +1090,10 @@ def GenerateSingleUserFeatureMatrix(user):
 
     # 将通过PoI获得的特征以及其他特征和停留点特征合并。
     stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+    with lock:
+        _,shareData.dat = SeriesToMatrix(user=user, data=stay, interval='M', maxrow=128)
 
-    SeriesToMatrix(user=user, data=stay, interval='M', maxrow=128)
-
+gFeatureThirdDimension = 0
 
 def GenerateFeatureMatrix(ProcessType = 'independent'):
     startTime = PrintStartInfo('GenerateFeatureMatrix()')
@@ -1100,14 +1101,26 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
     if ProcessType == 'independent':
         userList = gUserList
         ProcessPool = multiprocessing.Pool()
-        ProcessPool.map(GenerateSingleUserFeatureMatrix, userList)
+        ProcessManager = multiprocessing.Manager()
+        Lock = ProcessManager.Lock()
+        ShareData = ProcessManager.Namespace()
+        ShareData.dat = None
+
+        for user in userList:
+            ProcessPool.apply_async(GenerateSingleUserFeatureMatrix, args=(user, ShareData, Lock))
+
+        ProcessPool.close()
+        ProcessPool.join()
+
+        gFeatureThirdDimension = ShareData.dat
+        # print("GenerateFeatureMatrix gFeatureThirdDimension is {}".format(gFeatureThirdDimension))
     elif ProcessType == 'merged':
         pass
     PrintEndInfo('GenerateFeatureMatrix()', startTime=startTime)
 
 gAllUsersTrajectoriesFeatureMatrixSavePath = './Data/Output/AllUsersTrajectoriesFeature.csv'
 
-def CombineUsersMatrix(dropColunms=['stime', 'etime', 'stayid', 'lon', 'lat']):
+def CombineUsersMatrix():
 
     stay = pd.read_csv(gSingleUserStaySavePath.format(gUserList[0]), index_col=0)
     # FeatureThirdDimension = stay.shape[1] - len(dropColunms)
