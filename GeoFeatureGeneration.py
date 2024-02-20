@@ -381,36 +381,6 @@ def traj_stay_move(data, params,
 
     return stay, move
 
-
-def OneDayMatrix(stay, 
-                 col=['stime', 'grid', 'duration'],
-                 interval='D'):
-    data = stay.copy()
-    data['jtime'] = data['stime'].shift(-1)
-
-    
-
-    if interval == 'D':
-        
-
-        pass
-    elif interval == 'W':
-        pass
-    elif interval == 'M':
-        pass
-    elif interval == 'Q':
-        pass
-    elif interval == 'Y':
-        pass
-
-    
-    data['judageTime'] = data['stime'].shift(-1)
-    
-    pass
-
-
-
-
 # --- 辅助函数 --
 
 def PrintStartInfo(functionName, description=''):
