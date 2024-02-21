@@ -6,6 +6,8 @@
 # LastEditors: youareeverysingleday
 # Description: GeoFeatureGeneration功能中有需要共享的全局变量特别多，需要修改为类的形式才能方便传递。
 #   特别是生成的轨迹矩阵的形状，跨文件修改全局变量非常麻烦。
+# 导致这个问题的原因是因为多线程之间的参数传递。通过共享数据来解决这个问题。
+# 所有就可以不用写成类的形式了。
 
 import pandas as pd
 import numpy as np
