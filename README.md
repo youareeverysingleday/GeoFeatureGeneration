@@ -13,6 +13,16 @@ the target is to process the data into a format that enters machine learning.
 
 This package can concat multi vectorized features to one matrix.
 
+![project flow chart](./Pictures/FlowChart.png "project flow chart")
+
+
+### output data structure
+
+1. netural time series. completed.
+2. interaction matrxi. completed.
+3. similar netural language matrix. completed.
+4. graph structure. to be implemented.
+
 ## File structure
 
 .

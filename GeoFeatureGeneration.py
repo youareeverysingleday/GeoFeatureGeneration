@@ -1091,7 +1091,10 @@ def GenerateSingleUserFeatureMatrix(user, shareData, lock):
     # 将通过PoI获得的特征以及其他特征和停留点特征合并。
     stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
     with lock:
-        _,shareData.dat = SeriesToMatrix(user=user, data=stay, interval='M', maxrow=128)
+        _,shareData.dat = SeriesToMatrix(user=user, 
+                                         data=stay, 
+                                         interval='M', 
+                                         maxrow=gMaxRow)
 
 gFeatureThirdDimension = 0
 
