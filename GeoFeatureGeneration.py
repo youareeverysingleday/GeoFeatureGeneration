@@ -1270,11 +1270,16 @@ def GetParameters(parametersPath='./Parameters.json'):
 
 def GenerateGeoFeature(stayInterval=1800):
     # consume 1 minter.
+    startTime = datetime.datetime.now()
     GetPoIFeature()
+    endTime1 = datetime.datetime.now()
+    print("GetPoIFeature completed. {}".format(endTime1 - startTime))
 
     # consume 18:49 . 
     gSaveUserTrajectoryFlag=True
     PreprocessTrajectory(userRange='all', outputType='merged')
+    endTime2 = datetime.datetime.now()
+    print("PreprocessTrajectory completed. {}".format(endTime2 - endTime1))
 
     # consume 5:36 .
     # 两种模式都需要处理一次，主要时候后面最终输出为不同的格式时需要不同的数据形状。
@@ -1282,18 +1287,30 @@ def GenerateGeoFeature(stayInterval=1800):
     # 在生成轨迹特征的时候，单独处理一个dataframe效率太低，建议使用分别处理每个用户的形式。
     AttachFeaturetoTrajectory(outputType='independent')
     AttachFeaturetoTrajectory(outputType='merged')
+    endTime3 = datetime.datetime.now()
+    print("AttachFeaturetoTrajectory completed. {}".format(endTime3 - endTime2))
 
     # consume 1:26 .
     # 需要将区域外的地点都排除。
     gDeleteOutofBoundTrajectoryFlag = True
     GenerateInteractionMatrix()
+    endTime4 = datetime.datetime.now()
+    print("GenerateInteractionMatrix completed. {}".format(endTime4 - endTime3))
 
     # consume 2:24:26 .
     # 建议使用对每个用户分别处理的形式。最后再进行合并效率比较高。
     # test gfg.gUserList = ['079', '047']
     gDeleteOutofBoundTrajectoryFlag = True
     GenerateStayMove(ProcessType='independent')
+    endTime5 = datetime.datetime.now()
+    print("GenerateStayMove completed. {}".format(endTime5 - endTime4))
 
     GenerateFeatureMatrix(ProcessType='independent')
+    endTime6 = datetime.datetime.now()
+    print("GenerateFeatureMatrix completed. {}".format(endTime6 - endTime5))
 
     CombineUsersMatrix()
+    endTime7 = datetime.datetime.now()
+    print("CombineUsersMatrix completed. {}".format(endTime7 - endTime6))
+
+    print("All completed. {}".format(endTime7 - startTime))
