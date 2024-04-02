@@ -15,17 +15,18 @@
 import pandas as pd
 import numpy as np
 import datetime
-import time
+# import time
 
 import os
-import sys
+# import sys
 import math
 
 import multiprocessing
 
 import geopandas as gpd
+import json
 
-import sklearn
+# import sklearn
 
 
 def convertparams(params):
@@ -418,8 +419,6 @@ gSelectedColumne = ['category', 'longitude', 'latitude']
 gCategoryMapNumber = {'住宿服务':0, '商务住宅':1, '公共设施':2, '公司企业':3, '风景名胜':4, 
                     '金融保险服务':5, '政府机构及社会团体':6, '医疗保健服务':7, '生活服务':8, 
                     '餐饮服务':9, '科教文化服务':10, '购物服务':11, '体育休闲服务':12, '交通设施服务':13}
-
-
 
 
 # 轨迹数据的存储目录。
@@ -928,12 +927,17 @@ def drop_all_0_rows(df):
 
 # 生成特征矩阵时需要对所有的特征进行归一化。
 from sklearn.preprocessing import MinMaxScaler
+# 所有停留点数据缓存路径。
 gStaySavePath = './Data/Output/Stay.csv'
+# 所有一动点数据缓存路径。
 gMoveSavePath = './Data/Output/Move.csv'
 
+# 单个用户停留点保存路径。
 gSingleUserStaySavePath = './Data/Output/Stay/{}.csv'
+# 单个用户移动点保存路径。
 gSingleUserMoveSavePath = './Data/Output/Move/{}.csv'
 
+# 停留点矩阵，每行最多的停留点数量。也就是意味着矩阵第二维的长度。
 gMaxRow = 128
 
 def SeriesToMatrix(user, data, interval='M', maxrow=128,
@@ -1044,6 +1048,7 @@ def GenerateSingleUserStayMove(user):
 
     print('{} feature has completed.'.format(user))
 
+# 单个用户停留矩阵保存路径。
 gSingleUserStayMatrixSavePath = './Data/Output/StayMatrix/{}.csv'
 
 def GenerateStayMove(ProcessType = 'independent'):
@@ -1121,6 +1126,7 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
         pass
     PrintEndInfo('GenerateFeatureMatrix()', startTime=startTime)
 
+# 设置所有用户特征矩阵的保存路径。
 gAllUsersTrajectoriesFeatureMatrixSavePath = './Data/Output/AllUsersTrajectoriesFeature.csv'
 
 def CombineUsersMatrix():
@@ -1147,3 +1153,115 @@ def CombineUsersMatrix():
     
     print('CombineUsersMatrix has completed.')
     return AllUsersTrajectoriesFeature 
+
+
+def GetParameters(parametersPath='./Parameters.json'):
+    """_summary_
+    读取并设置程序所需的超参数。
+    Args:
+        parametersPath (str, optional): 保存超参数的JSON文档. Defaults to './Parameters.json'.
+    """
+    with open(parametersPath, 'r', encoding='utf-8') as f:
+        Parameters = json.load(f)
+    
+    # print(Parameters)
+    gBounds = list(Parameters['gBounds'])
+    # print(gBounds)
+
+    accuracy = int(Parameters['accuracy'])
+    method = Parameters['method']
+
+    # 设置全局地理信息。
+    gGeoParameters = area_to_params(gBounds, accuracy = accuracy, method=method)
+
+    # PoI特征输入目录。PoI文件夹的路径.
+    gPoIFolderPath = Parameters['gPoIFolderPath']
+    # 保存PoI特征的路径及文件名. Defaults to './Data/Output/PoIFeature.csv'.
+    gPoIFeatureSavePath = Parameters['gPoIFeatureSavePath']
+    gRenameColumns = dict(Parameters['gRenameColumns'])
+    # print(gRenameColumns)
+    gFileterColumne = list(Parameters['gFileterColumne'])
+    # print(gFileterColumne)
+    gSelectedColumne = list(Parameters['gSelectedColumne'])
+    # print(gSelectedColumne)
+    gCategoryMapNumber = dict(Parameters['gCategoryMapNumber'])
+    # print(gCategoryMapNumber)
+    
+    
+    # 轨迹数据的存储目录。
+    gTrajectoryFolderPath = Parameters['gTrajectoryFolderPath']
+
+    # 单个用户的保存目录。
+    gOutputProecessedTrajectory = Parameters['gOutputProecessedTrajectory']
+    # 所有用户的保存目录。
+    gInputTrajectoryCsvSavePath = Parameters['gInputTrajectoryCsvSavePath']
+    # 保存的输出的根目录。
+    gOutpuyPath = Parameters['gOutpuyPath']
+
+    # TrajectoriesBasePath = './Data/Geolife Trajectories 1.3/Data/'
+    # 轨迹原始数据采样间隔。
+    gSamplingIntervalRow = float(Parameters['gSamplingIntervalRow'])
+    # 在处理轨迹数据时，是否将所有范围之外的经纬度都删除。
+    # 1. 按照推荐系统的一般做法，会将没有出现在物品列表中的物品删除。
+    # 2. 而且在没有剔除范围外的地点时会产生大量编号为负数的grid。所以最后
+    # 考虑上述两个原因，先把范围之外的地点在最后生成轨迹特征时 GenerateInteractionMatrix() 删除。
+    gSaveUserTrajectoryFlag = bool(Parameters['gSaveUserTrajectoryFlag'])
+    # print(gSaveUserTrajectoryFlag, type(gSaveUserTrajectoryFlag))
+    # 单个用户轨迹附着了特征之后的保存路径。
+    gDeleteOutofBoundTrajectoryFlag = bool(Parameters['gDeleteOutofBoundTrajectoryFlag'])
+
+    # 单个用户轨迹附着了特征之后的保存路径。
+    gSingleUserTrajectoryFeaturePath = Parameters['gSingleUserTrajectoryFeaturePath']
+    # 所有用户的轨迹附着了特征之后的保存路径。
+    gAllUsersTrajectoryFeaturePath = Parameters['gAllUsersTrajectoryFeaturePath']
+    # 所有合并之后的特征。
+    # gFeaturePath = './Data/Output/Feature.csv'
+    # 暂时只有PoI特征。所以直接指向PoI特征。
+    gFeaturePath = Parameters['gFeaturePath']
+    # 交互矩阵保存的路径。
+    gInteractionMatrixSavePath = Parameters['gInteractionMatrixSavePath']
+    
+    # 所有停留点数据缓存路径。
+    gStaySavePath = Parameters['gStaySavePath']
+    # 所有一动点数据缓存路径。
+    gMoveSavePath = Parameters['gMoveSavePath']
+    
+    # 单个用户停留点保存路径。
+    gSingleUserStaySavePath = Parameters['gSingleUserStaySavePath']
+    # 单个用户移动点保存路径。
+    gSingleUserMoveSavePath = Parameters['gSingleUserMoveSavePath']
+    
+    # 停留点矩阵，每行最多的停留点数量。也就是意味着矩阵第二维的长度。
+    gMaxRow = int(Parameters['gMaxRow'])
+
+ 
+
+def GenerateGeoFeature(stayInterval=1800):
+    # consume 1 minter.
+    GetPoIFeature()
+
+    # consume 18:49 . 
+    gSaveUserTrajectoryFlag=True
+    PreprocessTrajectory(userRange='all', outputType='merged')
+
+    # consume 5:36 .
+    # 两种模式都需要处理一次，主要时候后面最终输出为不同的格式时需要不同的数据形状。
+    # 生成交互矩阵需要使用所有用户在一个dataframe的形式。
+    # 在生成轨迹特征的时候，单独处理一个dataframe效率太低，建议使用分别处理每个用户的形式。
+    AttachFeaturetoTrajectory(outputType='independent')
+    AttachFeaturetoTrajectory(outputType='merged')
+
+    # consume 1:26 .
+    # 需要将区域外的地点都排除。
+    gDeleteOutofBoundTrajectoryFlag = True
+    GenerateInteractionMatrix()
+
+    # consume 2:24:26 .
+    # 建议使用对每个用户分别处理的形式。最后再进行合并效率比较高。
+    # test gfg.gUserList = ['079', '047']
+    gDeleteOutofBoundTrajectoryFlag = True
+    GenerateStayMove(ProcessType='independent')
+
+    GenerateFeatureMatrix(ProcessType='independent')
+
+    CombineUsersMatrix()
