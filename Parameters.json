@@ -5,8 +5,11 @@
         117.4,
         41.6
     ],
-    "accuracy": 2000,
+    "accuracy": 1000,
     "method": "rect",
+    "gMaxRow": 128,
+    "gActivityTime":1800,
+    "gSamplingIntervalRow": 0,
     "gPoIFolderPath": "./Data/BeiJing/",
     "gPoIFeatureSavePath": "./Data/Output/MultipleFeatures/PoIFeature.csv",
     "gRenameColumns": {
@@ -56,7 +59,6 @@
     "gOutputProecessedTrajectory": "./Data/Output/ProcessedTrajectories/{}.csv",
     "gInputTrajectoryCsvSavePath": "./Data/Output/Trajectories/{}.csv",
     "gOutpuyPath": "./Data/Output/",
-    "gSamplingIntervalRow": 0,
     "gSaveUserTrajectoryFlag": false,
     "gDeleteOutofBoundTrajectoryFlag": false,
     "gSingleUserTrajectoryFeaturePath": "./Data/Output/TrajectoryFeature/{}.csv",
@@ -66,6 +68,5 @@
     "gStaySavePath": "./Data/Output/Stay.csv",
     "gMoveSavePath": "./Data/Output/Move.csv",
     "gSingleUserStaySavePath": "./Data/Output/Stay/{}.csv",
-    "gSingleUserMoveSavePath": "./Data/Output/Move/{}.csv",
-    "gMaxRow": 128
+    "gSingleUserMoveSavePath": "./Data/Output/Move/{}.csv"
 }

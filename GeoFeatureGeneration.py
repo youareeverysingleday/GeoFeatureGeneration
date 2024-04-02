@@ -1018,6 +1018,9 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128,
     print('{} SeriesToMatrix have completed.'.format(user))
     return result, FeatureThirdDimension
 
+# 用于判断停留点的时间阈值。
+gActivityTime = 1800
+
 def GenerateSingleUserStayMove(user):
     """_summary_
     生成单个用户的特征。在处理整个用户轨迹特征文件的时候非常耗时。所以推荐使用分别处理每个单个用户的轨迹特征。
@@ -1041,7 +1044,8 @@ def GenerateSingleUserStayMove(user):
 
     stay, move = traj_stay_move(userTrajectory, 
                                 gGeoParameters,
-                                col=['userID', 'entireTime', 'longitude', 'latitude'])
+                                col=['userID', 'entireTime', 'longitude', 'latitude'], 
+                                activitytime=gActivityTime)
 
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
@@ -1078,7 +1082,8 @@ def GenerateStayMove(ProcessType = 'independent'):
         # user stay and move to decide sentence length .
         stay, move = traj_stay_move(Trajectories, 
                                     gGeoParameters,
-                                    col=['userID', 'entireTime', 'longitude', 'latitude'])
+                                    col=['userID', 'entireTime', 'longitude', 'latitude'],
+                                    activitytime=gActivityTime)
 
         stay.to_csv(gStaySavePath)
         move.to_csv(gMoveSavePath)
@@ -1163,16 +1168,52 @@ def GetParameters(parametersPath='./Parameters.json'):
     """
     with open(parametersPath, 'r', encoding='utf-8') as f:
         Parameters = json.load(f)
+
+    # 全局变量声明
+    global gBounds
+    global gGeoParameters
+    global gPoIFolderPath
+    global gPoIFeatureSavePath
+    global gRenameColumns
+    global gFileterColumne
+    global gSelectedColumne
+    global gCategoryMapNumber
+    global gTrajectoryFolderPath
+    global gOutputProecessedTrajectory
+    global gInputTrajectoryCsvSavePath
+    global gOutpuyPath
+    global gSamplingIntervalRow
+    global gSaveUserTrajectoryFlag
+    global gDeleteOutofBoundTrajectoryFlag
+    global gSingleUserTrajectoryFeaturePath
+    global gAllUsersTrajectoryFeaturePath
+    global gFeaturePath
+    global gInteractionMatrixSavePath
+    global gStaySavePath
+    global gMoveSavePath
+    global gSingleUserStaySavePath
+    global gSingleUserMoveSavePath
+    global gMaxRow
+    global gActivityTime
     
     # print(Parameters)
+    # 研究地域范围。通过经纬度表示。
     gBounds = list(Parameters['gBounds'])
     # print(gBounds)
 
+    # 地域网格的大小。单位为米。
     accuracy = int(Parameters['accuracy'])
+    # 网格的形状，默认是正方形。
     method = Parameters['method']
 
     # 设置全局地理信息。
     gGeoParameters = area_to_params(gBounds, accuracy = accuracy, method=method)
+    # 停留点矩阵，每行最多的停留点数量。也就是意味着矩阵第二维的长度。
+    gMaxRow = int(Parameters['gMaxRow'])
+    # 用于生成停留点的时间判断阈值。
+    gActivityTime = int(Parameters['gActivityTime'])
+    # 轨迹原始数据采样间隔。
+    gSamplingIntervalRow = float(Parameters['gSamplingIntervalRow'])
 
     # PoI特征输入目录。PoI文件夹的路径.
     gPoIFolderPath = Parameters['gPoIFolderPath']
@@ -1187,20 +1228,16 @@ def GetParameters(parametersPath='./Parameters.json'):
     gCategoryMapNumber = dict(Parameters['gCategoryMapNumber'])
     # print(gCategoryMapNumber)
     
-    
     # 轨迹数据的存储目录。
     gTrajectoryFolderPath = Parameters['gTrajectoryFolderPath']
-
     # 单个用户的保存目录。
     gOutputProecessedTrajectory = Parameters['gOutputProecessedTrajectory']
     # 所有用户的保存目录。
     gInputTrajectoryCsvSavePath = Parameters['gInputTrajectoryCsvSavePath']
     # 保存的输出的根目录。
     gOutpuyPath = Parameters['gOutpuyPath']
-
     # TrajectoriesBasePath = './Data/Geolife Trajectories 1.3/Data/'
-    # 轨迹原始数据采样间隔。
-    gSamplingIntervalRow = float(Parameters['gSamplingIntervalRow'])
+    
     # 在处理轨迹数据时，是否将所有范围之外的经纬度都删除。
     # 1. 按照推荐系统的一般做法，会将没有出现在物品列表中的物品删除。
     # 2. 而且在没有剔除范围外的地点时会产生大量编号为负数的grid。所以最后
@@ -1230,11 +1267,6 @@ def GetParameters(parametersPath='./Parameters.json'):
     gSingleUserStaySavePath = Parameters['gSingleUserStaySavePath']
     # 单个用户移动点保存路径。
     gSingleUserMoveSavePath = Parameters['gSingleUserMoveSavePath']
-    
-    # 停留点矩阵，每行最多的停留点数量。也就是意味着矩阵第二维的长度。
-    gMaxRow = int(Parameters['gMaxRow'])
-
- 
 
 def GenerateGeoFeature(stayInterval=1800):
     # consume 1 minter.
