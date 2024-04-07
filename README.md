@@ -28,6 +28,7 @@ This package can concat multi vectorized features to one matrix.
 .
 ├─README.md
 ├─GeoFeatureGeneration.py
+├─Parameters.json
 ├─Data
 │  ├─BeiJing
 │  │   └─Data
@@ -82,9 +83,9 @@ This package can concat multi vectorized features to one matrix.
 |1|pandas||
 |2|numpy||
 |3|multiprocessing/python|>=3.9|
-|4|||
-|5|||
-|6|||
+|4|geopandas||
+|5|json||
+|6|datetime||
 |7|||
 |8|||
 ||||
