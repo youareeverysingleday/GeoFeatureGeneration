@@ -307,6 +307,7 @@ def traj_stay_move(data, params,
         move information
     '''
     uid, timecol, lon, lat, grid = col
+    # uid, timecol, lon, lat = col
     # Identify stay
     data = data.sort_values(by=col[:2])
     stay = data.copy()
@@ -1032,25 +1033,52 @@ def GenerateSingleUserStayMove(user):
                                  index_col=0,
                                  parse_dates=['entireTime'])
     
-    
     # 去掉范围之外的轨迹。
     if gDeleteOutofBoundTrajectoryFlag == True:
         userTrajectory = clean_outofbounds(userTrajectory, 
                                          gBounds, 
                                          col=['longitude', 'latitude'])
-    
-    # 生成时间特征。时间戳的特征也会在后面获取。
-    userTrajectory = userTrajectory.apply(GenerateTimeFeature, axis=1)
 
     stay, move = traj_stay_move(userTrajectory, 
                                 gGeoParameters,
-                                col=['userID', 'entireTime', 'longitude', 'latitude'], 
+                                col=['userID', 'entireTime', 'longitude', 'latitude', 'grid'], 
                                 activitytime=gActivityTime)
+    
+    # 生成时间特征。时间戳的特征也会在后面获取。
+    stay = stay.apply(GenerateTimeFeature, axis=1)
+    move = move.apply(GenerateTimeFeature, axis=1)
 
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
 
     print('{} feature has completed.'.format(user))
+
+
+def GenerateStayMoveByChunk(chunk):
+    startTime = PrintStartInfo('GenerateStayMoveByChunk()')
+    if gDeleteOutofBoundTrajectoryFlag == True:
+        chunk = clean_outofbounds(chunk, gBounds, col=['longitude', 'latitude'])
+    
+    # user stay and move to decide sentence length .
+    stay, move = traj_stay_move(chunk, 
+                                gGeoParameters,
+                                col=['userID', 'entireTime', 'longitude', 'latitude', 'grid'],
+                                activitytime=gActivityTime)
+    
+    # 需要生成时间特征。
+    stay = stay.apply(GenerateTimeFeature, axis=1)
+    move = move.apply(GenerateTimeFeature, axis=1)
+
+    # 读取所有特征。
+    PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
+    PoIFeature['grid'] = PoIFeature.index
+
+    # 将通过PoI获得的特征以及其他特征和停留点特征合并。
+    stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+    move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
+
+    PrintEndInfo('GenerateStayMoveByChunk()', startTime=startTime)
+    return stay, move
 
 # 单个用户停留矩阵保存路径。
 gSingleUserStayMatrixSavePath = './Data/Output/StayMatrix/{}.csv'
@@ -1067,26 +1095,47 @@ def GenerateStayMove(ProcessType = 'independent'):
         ProcessPool.map(GenerateSingleUserStayMove, userList)
     # 处理所有用户整个处于一个csv中。效率比较低。推荐使用independent模式。
     elif ProcessType == 'merged':
-        Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
-                                index_col=0, parse_dates=['entireTime'])
-        if gDeleteOutofBoundTrajectoryFlag == True:
-            Trajectories = clean_outofbounds(Trajectories, gBounds, col=['longitude', 'latitude'])
+        # Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
+        #                         index_col=0, parse_dates=['entireTime'])
+        # if gDeleteOutofBoundTrajectoryFlag == True:
+        #     Trajectories = clean_outofbounds(Trajectories, gBounds, col=['longitude', 'latitude'])
         
-        # 需要生成时间特征。
-        Trajectories = Trajectories.apply(GenerateTimeFeature, axis=1)
+        # # 需要生成时间特征。
+        # Trajectories = Trajectories.apply(GenerateTimeFeature, axis=1)
 
-        # 高度信息不能丢弃，也作为一种特征。
-        # 需要判断停留点。
-        # 需要的将地点的文字描述embedding之后也作为特征保存在特征矩阵中。
+        # # 高度信息不能丢弃，也作为一种特征。
+        # # 需要判断停留点。
+        # # 需要的将地点的文字描述embedding之后也作为特征保存在特征矩阵中。
         
-        # user stay and move to decide sentence length .
-        stay, move = traj_stay_move(Trajectories, 
-                                    gGeoParameters,
-                                    col=['userID', 'entireTime', 'longitude', 'latitude'],
-                                    activitytime=gActivityTime)
+        # # user stay and move to decide sentence length .
+        # stay, move = traj_stay_move(Trajectories, 
+        #                             gGeoParameters,
+        #                             col=['userID', 'entireTime', 'longitude', 'latitude', 'grid'],
+        #                             activitytime=gActivityTime)
 
-        stay.to_csv(gStaySavePath)
-        move.to_csv(gMoveSavePath)
+        chunksize = 100000
+        chunks = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
+                    index_col=0, parse_dates=['entireTime'],
+                    chunksize=chunksize)
+        ProcessPool = multiprocessing.Pool()
+        results = ProcessPool.map(GenerateStayMoveByChunk, chunks)
+
+        PrintEndInfo('GenerateStayMove() multiprocess completed.', startTime=startTime)
+
+        stays = pd.DataFrame()
+        moves = pd.DataFrame()
+        for stay, move in results:
+            # print("--- stay format :{}".format(type(stay)))
+            # stays.append(stay)
+            # moves.append(move)
+            stays = pd.concat([stays, stay])
+            moves = pd.concat([moves, move])
+            
+        # stays = pd.concat(stay)
+        # moves = pd.concat(move)
+
+        stays.to_csv(gStaySavePath)
+        moves.to_csv(gMoveSavePath)
 
     PrintEndInfo('GenerateStayMove()', startTime=startTime)
 
@@ -1100,8 +1149,9 @@ def GenerateSingleUserFeatureMatrix(user, shareData, lock):
 
     # 将通过PoI获得的特征以及其他特征和停留点特征合并。
     stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+    # 生成矩阵并保存。
     with lock:
-        _,shareData.dat = SeriesToMatrix(user=user, 
+        _, shareData.dat = SeriesToMatrix(user=user, 
                                          data=stay, 
                                          interval='M', 
                                          maxrow=gMaxRow)
@@ -1125,7 +1175,8 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
         ProcessPool.close()
         ProcessPool.join()
 
-        gFeatureThirdDimension = ShareData.dat
+        global gFeatureThirdDimension
+        gFeatureThirdDimension = ShareData.dat.shape[2]
         # print("GenerateFeatureMatrix gFeatureThirdDimension is {}".format(gFeatureThirdDimension))
     elif ProcessType == 'merged':
         pass
@@ -1159,6 +1210,8 @@ def CombineUsersMatrix():
     print('CombineUsersMatrix has completed.')
     return AllUsersTrajectoriesFeature 
 
+# select output data format.
+gOutputDataFormat = []
 
 def GetParameters(parametersPath='./Parameters.json'):
     """_summary_
@@ -1195,6 +1248,7 @@ def GetParameters(parametersPath='./Parameters.json'):
     global gSingleUserMoveSavePath
     global gMaxRow
     global gActivityTime
+    global gOutputDataFormat
     
     # print(Parameters)
     # 研究地域范围。通过经纬度表示。
@@ -1267,6 +1321,8 @@ def GetParameters(parametersPath='./Parameters.json'):
     gSingleUserStaySavePath = Parameters['gSingleUserStaySavePath']
     # 单个用户移动点保存路径。
     gSingleUserMoveSavePath = Parameters['gSingleUserMoveSavePath']
+    # select output data format.
+    gOutputDataFormat = list(Parameters['gOutputDataFormat'])
 
 def GenerateGeoFeature(stayInterval=1800):
     # consume 1 minter.
@@ -1302,6 +1358,7 @@ def GenerateGeoFeature(stayInterval=1800):
     # test gfg.gUserList = ['079', '047']
     gDeleteOutofBoundTrajectoryFlag = True
     GenerateStayMove(ProcessType='independent')
+    GenerateStayMove(ProcessType='merged')
     endTime5 = datetime.datetime.now()
     print("GenerateStayMove completed. {}".format(endTime5 - endTime4))
 
