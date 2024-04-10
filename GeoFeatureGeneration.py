@@ -1048,6 +1048,16 @@ def GenerateSingleUserStayMove(user):
     stay = stay.apply(GenerateTimeFeature, axis=1)
     move = move.apply(GenerateTimeFeature, axis=1)
 
+    # 读取所有特征。
+    PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
+    PoIFeature['grid'] = PoIFeature.index
+
+    # 将通过PoI获得的特征以及其他特征和停留点特征合并。
+    stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+    # move contain feature of start place and feature of end place.
+    # so, feature of move need special process.
+    # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
+
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
 
@@ -1066,8 +1076,8 @@ def GenerateStayMoveByChunk(chunk):
                                 activitytime=gActivityTime)
     
     # 需要生成时间特征。
-    stay = stay.apply(GenerateTimeFeature, axis=1)
-    move = move.apply(GenerateTimeFeature, axis=1)
+    stay = stay.apply(GenerateTimeFeature, col='etime', axis=1)
+    move = move.apply(GenerateTimeFeature, col='etime', axis=1)
 
     # 读取所有特征。
     PoIFeature = pd.read_csv(gFeaturePath, index_col=0)
@@ -1075,7 +1085,9 @@ def GenerateStayMoveByChunk(chunk):
 
     # 将通过PoI获得的特征以及其他特征和停留点特征合并。
     stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
-    move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
+    # move contain feature of start place and feature of end place.
+    # so, feature of move need special process.
+    # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
 
     PrintEndInfo('GenerateStayMoveByChunk()', startTime=startTime)
     return stay, move

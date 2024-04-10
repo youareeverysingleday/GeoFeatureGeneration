@@ -7,6 +7,24 @@ This package can not run in jupyter, because package has used "mulitprocessing".
 
 这个包可以将数据处理为各种需要的格式输出。以满足多种模型对数据的需求。其中以统计型矩阵、类似于自然语言的矩阵和时序的形式为主。从而满足多种机器学习算法的需求。
 
+## publish information
+
+|number|publish time|version|modify content|
+|---|---|---|---|
+|1|20240219|1.0.0|can output matrix of trajectory.|
+|2|20240409|1.0.1|output series of stay contain PoI feature.|
+|||||
+|||||
+|||||
+|||||
+
+## next plan
+
+1. 完成geo特征的合并，在输出数据结构的时候使用合并之后的Geo特征。
+2. move的特征需要特殊处理。因为move包含起点和终点，有两个地理特征。
+3. 需要统一的列名。不能在不同的函数中使用不同的列名。
+4. 输出图结构的数据。
+
 ## Function desrciption
 
 the target is to process the data into a format that enters machine learning.
