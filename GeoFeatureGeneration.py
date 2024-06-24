@@ -815,6 +815,91 @@ def PreprocessTrajectory(userRange,
 
 # --- 合并特征 ---
 
+def findAllFile(base):
+    for root, ds, fs in os.walk(base):
+        for f in fs:
+            fullname = os.path.join(root, f)
+            yield fullname, root
+
+def DropInforNegativeFeature(FolderPath='./Data/origin', sep='\|\+\+\|'):
+    """_summary_
+    完成去信息化处理。
+    Args:
+        FolderPath (str, optional): 数据文件存储文件夹. Defaults to './data/origin'.
+        sep (str, optional): 分隔符. Defaults to '\|\+\+\|'.
+
+    Returns:
+        pandas.DataFrame: 返回去信息化之后的数据。
+    """
+    NegativeFeature = pd.DataFrame()
+    for fullname, _ in findAllFile(FolderPath):
+        temp = pd.read_table(fullname, 
+                            sep=sep, 
+                            names=['ID', 'category', 'subcategory', 'longitude', 'latitude'], 
+                            dtype={'ID':str, 'category':str, 'subcategory':str}, engine='python')
+        NegativeFeature = pd.concat([NegativeFeature, temp], ignore_index=True)
+
+    print(NegativeFeature.shape)
+    print('NegativeFeature memory usage is {} MB.'.format(NegativeFeature.memory_usage().sum()/(1024.0 ** 2)))
+    # 按照ID去重。
+    NegativeFeature.drop_duplicates(subset='ID', keep='first', inplace=True)
+    # print(NegativeFeature.shape)
+    # 将索引列替代为ID列。
+    NegativeFeature.reset_index(inplace=True)
+    # 删除原ID列和subcategory列。
+    NegativeFeature.drop(labels=['ID', 'subcategory'], axis=1, inplace=True)
+    NegativeFeature.rename(columns={'index':'ID'}, inplace=True)
+
+    # 将category使用其他的值替代。生成类别替代的映射表。
+    # t11 = pd.DataFrame(t1.groupby(by='category').groups.keys()).reset_index()
+    CatrgoryMaping = pd.DataFrame(NegativeFeature.groupby(by='category').groups.keys()).reset_index()
+    CatrgoryMaping.columns = ['icategory', 'category']
+    # 保存一份对应关系表。
+    CatrgoryMaping.to_csv('./Data/categoryMaping.csv')
+
+    # 将类别映射为新的类别。
+    NegativeFeature = NegativeFeature.join(CatrgoryMaping.set_index('category'), on='category', 
+                                        how='left', lsuffix='_left', rsuffix='_right')
+    NegativeFeature.drop(labels=['category'], axis=1, inplace=True)
+    # 原始数据(XXXXXX, X)，在转换类型的过程中有XXXX个空值。直接删除空值。
+    print(NegativeFeature['icategory'].isnull().sum())
+    print(NegativeFeature.shape)
+    NegativeFeature.dropna(inplace=True)
+    # 删除经纬度中非数字的行。
+    NegativeFeature['longitude'] = pd.to_numeric(NegativeFeature['longitude'], errors='coerce')
+    NegativeFeature['latitude'] = pd.to_numeric(NegativeFeature['latitude'], errors='coerce')
+    print(NegativeFeature.shape)
+
+    # 将icategory的类型强制转化为int型。
+    NegativeFeature['icategory'] = NegativeFeature['icategory'].astype(np.int16)
+    NegativeFeature['longitude'] = NegativeFeature['longitude'].astype(np.float16)
+    NegativeFeature['latitude'] = NegativeFeature['latitude'].astype(np.float16)
+    print(NegativeFeature.shape)
+    # NegativeFeature.head(3)
+
+    NegativeFeature.to_csv('./Data/NegativeFeatureDropInfor.csv')
+    return NegativeFeature
+
+# NegativeFeature = DropInforNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|')
+# NegativeFeature.head(3)
+
+def PreprocessNegativeFeature(FolderPath='./Data/origin', sep='\|\+\+\|'):
+    NegativeFeature = DropInforNegativeFeature(FolderPath='./Data/origin', sep='\|\+\+\|')
+    _, _, NegativeFeature['grid'] = GPS_to_grid(NegativeFeature['longitude'], NegativeFeature['latitude'], gGeoParameters)
+
+    NegativeFeature = clean_outofbounds(NegativeFeature, bounds = gBounds, col = ['longitude', 'latitude'])
+
+    print(NegativeFeature.shape)
+
+    df = NegativeFeature[['icategory', 'grid']].copy()
+    df['temp'] = 0
+    df = df.pivot_table(index='grid',columns='icategory', values='temp', aggfunc='count').fillna(0)
+    print(df.shape)
+
+    df.to_csv('./data/NegativeFeature.csv')
+    # df.sample(3)
+    return df
+
 # 暂时外部特征只有PoI特征，后期还会有其他的特征需要处理。
 def CombineRegionFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/', 
                           FeatureSavePath='./Data/Output/Feature.csv'):
