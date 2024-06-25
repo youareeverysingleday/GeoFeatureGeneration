@@ -412,7 +412,7 @@ gGeoParameters = area_to_params(gBounds, accuracy = 1000, method='rect')
 # PoI特征输入目录。PoI文件夹的路径.
 gPoIFolderPath = './Data/BeiJing/'
 # 保存PoI特征的路径及文件名. Defaults to './Data/Output/PoIFeature.csv'.
-gPoIFeatureSavePath = './Data/Output/MultipleFeatures/PoIFeature.csv'
+gPoIFeatureSavePath = './Data/Output/PoIFeature.csv'
 gRenameColumns = {'名称':'name','大类':'category','中类':'class', '小类':'type', 
                     '省':'province', '市':'city', '区':'district', 'WGS84_经度':'longitude', 'WGS84_纬度':'latitude'}
 gFileterColumne = ['名称', '大类', '中类', '小类', '省', '市', '区', 'WGS84_经度', 'WGS84_纬度']
@@ -448,9 +448,9 @@ gDeleteOutofBoundTrajectoryFlag = False
 
 # --- 获取PoI特征 ---
 
-def GeneratePoIFeature(FilePath, fileParameters, GeoParameters, gSharedData, lock):
+def GenerateSingleSoicalPoIFeature(FilePath, fileParameters, GeoParameters, gSharedData, lock):
     """_summary_
-    对单个用户进行处理，生成PoI特征。使用multiprocessing进行处理。
+    对单个类别进行处理，生成PoI特征。使用multiprocessing进行处理。
     Args:
         FilePath (_type_): _description_
         fileParameters (_type_): _description_
@@ -495,17 +495,17 @@ def GeneratePoIFeature(FilePath, fileParameters, GeoParameters, gSharedData, loc
     # print(df.head(3))
 
     with lock:
-        # 按列名拼接。也就是列名相同的会自动对应，缺少的列填空值。
+        # 按列名拼接。也就是列名相同的会自动对应，缺少的列填0值。
         # 此时的index是grid，后面还需要聚合操作的，所以不能忽略。
         gSharedData.dat = pd.concat([gSharedData.dat, df]).fillna(0.0)
 
-def GetPoIFeature():
+def GetSocialPoIFeature():
     """_summary_
     生成PoI特征。
     Returns:
         _type_: _description_
     """
-    startTime = PrintStartInfo(functionName='GetPoIFeature()')
+    startTime = PrintStartInfo(functionName='GetSocialPoIFeature()')
     # 检测POI特征的路径是否存在。不存在则返回。
     if os.path.exists(gPoIFolderPath) ==False:
         print('{} is not exist.'.format(gPoIFolderPath))
@@ -535,7 +535,7 @@ def GetPoIFeature():
     for fn in AllFilesName:
         FilePath = (gPoIFolderPath + "{}").format(fn)
         # 多进程处理。
-        gMultiProcessingPool.apply_async(GeneratePoIFeature, 
+        gMultiProcessingPool.apply_async(GenerateSingleSoicalPoIFeature, 
                                          args=(FilePath, fileParameters, gGeoParameters, gSharedData, gMultiProcessinglock))
     
     gMultiProcessingPool.close()
@@ -548,16 +548,155 @@ def GetPoIFeature():
     # RegionFeature = pd.DataFrame()
 
     # 如果PoI特征文件已经存在，那么发出提示，并且之后将会覆盖。
-    if os.path.exists(gPoIFeatureSavePath) == True:
-        print('{} is exist, will overwrite.'.format(gPoIFeatureSavePath))
+    if os.path.exists(gPoISocialFeatureSavePath) == True:
+        print('{} is exist, will overwrite.'.format(gPoISocialFeatureSavePath))
     
-    gSharedData.dat.to_csv(gPoIFeatureSavePath)
-    PrintEndInfo(functionName='GetPoIFeature()', startTime=startTime)
+    # 将这部分PoI特征复制一份并返回。
+    partofPoIFeature = gSharedData.dat.copy()
+    gSharedData.dat.to_csv(gPoISocialFeatureSavePath)
+    
+    PrintEndInfo(functionName='GetSocialPoIFeature()', startTime=startTime)
+
+    return partofPoIFeature
+
+
+# --- 合并PoI特征 ---
+
+def findAllFile(base):
+    for root, ds, fs in os.walk(base):
+        for f in fs:
+            fullname = os.path.join(root, f)
+            yield fullname, root
+
+def AddStringIncolumn(df, columnName, content):
+    df[columnName] = '{}{}'.format(content, df[columnName])
+    return df
+
+def DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|'):
+    """_summary_
+    完成脱敏处理。
+    Args:
+        FolderPath (str, optional): 数据文件存储文件夹. Defaults to './data/origin'.
+        sep (str, optional): 分隔符. Defaults to '\|\+\+\|'.
+
+    Returns:
+        pandas.DataFrame: 返回脱敏之后的数据。
+    """
+    NegativeFeature = pd.DataFrame()
+    for fullname, _ in findAllFile(FolderPath):
+        temp = pd.read_table(fullname, 
+                            sep=sep, 
+                            names=['ID', 'category', 'subcategory', 'longitude', 'latitude'], 
+                            dtype={'ID':str, 'category':str, 'subcategory':str}, engine='python')
+        NegativeFeature = pd.concat([NegativeFeature, temp], ignore_index=True)
+
+    print(NegativeFeature.shape)
+    print('NegativeFeature memory usage is {} MB.'.format(NegativeFeature.memory_usage().sum()/(1024.0 ** 2)))
+    # 按照ID去重。
+    NegativeFeature.drop_duplicates(subset='ID', keep='first', inplace=True)
+    # print(NegativeFeature.shape)
+    # 将索引列替代为ID列。
+    NegativeFeature.reset_index(inplace=True)
+    # 删除原ID列和subcategory列。
+    NegativeFeature.drop(labels=['ID', 'subcategory'], axis=1, inplace=True)
+    NegativeFeature.rename(columns={'index':'ID'}, inplace=True)
+
+    # 将category使用其他的值替代。生成类别替代的映射表。
+    # t11 = pd.DataFrame(t1.groupby(by='category').groups.keys()).reset_index()
+    CatrgoryMaping = pd.DataFrame(NegativeFeature.groupby(by='category').groups.keys()).reset_index()
+    CatrgoryMaping.columns = ['icategory', 'category']
+    # 保存一份对应关系表。
+    CatrgoryMaping.to_csv('./data/categoryMaping.csv')
+
+    # 将类别映射为新的类别。
+    NegativeFeature = NegativeFeature.join(CatrgoryMaping.set_index('category'), on='category', 
+                                        how='left', lsuffix='_left', rsuffix='_right')
+    NegativeFeature.drop(labels=['category'], axis=1, inplace=True)
+    # 原始数据(912974, 5)，在转换类型的过程中有2483个空值。直接删除空值。
+    print(NegativeFeature['icategory'].isnull().sum())
+    print(NegativeFeature.shape)
+    NegativeFeature.dropna(inplace=True)
+    # 删除经纬度中非数字的行。
+    NegativeFeature['longitude'] = pd.to_numeric(NegativeFeature['longitude'], errors='coerce')
+    NegativeFeature['latitude'] = pd.to_numeric(NegativeFeature['latitude'], errors='coerce')
+    print(NegativeFeature.shape)
+
+    # 将icategory的类型强制转化为int型。
+    NegativeFeature['icategory'] = NegativeFeature['icategory'].astype(np.int16)
+    NegativeFeature['longitude'] = NegativeFeature['longitude'].astype(np.float16)
+    NegativeFeature['latitude'] = NegativeFeature['latitude'].astype(np.float16)
+
+    # 重新定义一个category列，因为icategory是整型，不便于转化为字符串的同时赋值给原列。
+    NegativeFeature['category'] = ''
+
+    # 单纯的数字不适合做分类名称，所以前面加一个标识nf_。表示nagetive feature的意思。
+    NegativeFeature = NegativeFeature.apply(AddStringIncolumn, columnName='icategory', content='nf_', axis=1)
+    NegativeFeature.drop(labels=['icategory'], axis=1, inplace=True)
+
+    print(NegativeFeature.shape)
+    # NegativeFeature.head(3)
+    # "gPoIDropInforNegativelFeatureSavePath":"./Data/Output/Temp/DropInforNegativeFeature.csv",
+    NegativeFeature.to_csv(gPoIDropInforNegativelFeatureSavePath)
+    return NegativeFeature
+
+# NegativeFeature = DropInforNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|')
+# NegativeFeature.head(3)
+
+def PreprocessNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|'):
+
+    if os.path.exists(FolderPath) == False:
+        print('Origin data of negative Feature  is not exist.')
+        return None
+
+    NegativeFeature = DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|')
+    _, _, NegativeFeature['grid'] = GPS_to_grid(NegativeFeature['longitude'], NegativeFeature['latitude'], gGeoParameters)
+
+    NegativeFeature = clean_outofbounds(NegativeFeature, bounds = gBounds, col = ['longitude', 'latitude'])
+
+    print(NegativeFeature.shape)
+
+    df = NegativeFeature[['category', 'grid']].copy()
+    df['temp'] = 0
+    df = df.pivot_table(index='grid',columns='category', values='temp', aggfunc='count').fillna(0)
+    print(df.shape)
+
+    if os.path.exists(gPoINegativelFeatureSavePath) == True:
+        print('{} is exist, will overwrite.'.format(gPoINegativelFeatureSavePath))
+
+    # gPoINegativelFeatureSavePath
+    df.to_csv(gPoINegativelFeatureSavePath)
+    # df.sample(3)
+    return df
+
+# 合并生成PoI特征。
+def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/', 
+                          FeatureSavePath='./Data/Output/PoIFeature.csv'):
+    """_summary_
+    目前只有2个PoI特征，将其合并之后保存。
+    两个输入参数没有使用，而是通过全局变量从json文件中读取的。
+    Args:
+        FeaturesFolderPath (str, optional): _description_. Defaults to './Data/Output/MultipleFeatures/'.
+        FeatureSavePath (str, optional): _description_. Defaults to './Data/Output/PoIFeature.csv'.
+    """
+    NegativeFeature = pd.DataFrame()
+    # 如果存在则直接读取。默认是存在的。
+    if os.path.exists(gPoINegativelFeatureSavePath) == True:
+        # 第一列是grid作为index列。
+        NegativeFeature = pd.read_csv(gPoINegativelFeatureSavePath, index_col=0)
+    else:
+        NegativeFeature = PreprocessNegativeFeature()
+    PartofPoIFeature = GetSocialPoIFeature()
+    
+    # 按区域编号进行拼接，也就是按行进行拼接。缺少的行填0。
+    PoIFeature = pd.concat([NegativeFeature, PartofPoIFeature], axis=0).fillna(0.0)
+
+    if os.path.exists(gPoIFeatureSavePath) == True:
+        print('{} is exist, it will overwrite.'.format(gPoIFeatureSavePath))
+
+    PoIFeature.to_csv(gPoIFeatureSavePath)
 
 
 # --- 读取轨迹数据 ---
-
-
 def GetEntireTime(df):
     # 先拼成完整的时间。
     df['entireTime'] = \
@@ -812,98 +951,6 @@ def PreprocessTrajectory(userRange,
         ProcessSharedData.dat.to_csv(saveLcoation)
         PrintEndInfo(functionName='PreprocessTrajectory', startTime=startTime)
         # return MultiTrajectorys_pd
-
-# --- 合并特征 ---
-
-def findAllFile(base):
-    for root, ds, fs in os.walk(base):
-        for f in fs:
-            fullname = os.path.join(root, f)
-            yield fullname, root
-
-def DropInforNegativeFeature(FolderPath='./Data/origin', sep='\|\+\+\|'):
-    """_summary_
-    完成去信息化处理。
-    Args:
-        FolderPath (str, optional): 数据文件存储文件夹. Defaults to './data/origin'.
-        sep (str, optional): 分隔符. Defaults to '\|\+\+\|'.
-
-    Returns:
-        pandas.DataFrame: 返回去信息化之后的数据。
-    """
-    NegativeFeature = pd.DataFrame()
-    for fullname, _ in findAllFile(FolderPath):
-        temp = pd.read_table(fullname, 
-                            sep=sep, 
-                            names=['ID', 'category', 'subcategory', 'longitude', 'latitude'], 
-                            dtype={'ID':str, 'category':str, 'subcategory':str}, engine='python')
-        NegativeFeature = pd.concat([NegativeFeature, temp], ignore_index=True)
-
-    print(NegativeFeature.shape)
-    print('NegativeFeature memory usage is {} MB.'.format(NegativeFeature.memory_usage().sum()/(1024.0 ** 2)))
-    # 按照ID去重。
-    NegativeFeature.drop_duplicates(subset='ID', keep='first', inplace=True)
-    # print(NegativeFeature.shape)
-    # 将索引列替代为ID列。
-    NegativeFeature.reset_index(inplace=True)
-    # 删除原ID列和subcategory列。
-    NegativeFeature.drop(labels=['ID', 'subcategory'], axis=1, inplace=True)
-    NegativeFeature.rename(columns={'index':'ID'}, inplace=True)
-
-    # 将category使用其他的值替代。生成类别替代的映射表。
-    # t11 = pd.DataFrame(t1.groupby(by='category').groups.keys()).reset_index()
-    CatrgoryMaping = pd.DataFrame(NegativeFeature.groupby(by='category').groups.keys()).reset_index()
-    CatrgoryMaping.columns = ['icategory', 'category']
-    # 保存一份对应关系表。
-    CatrgoryMaping.to_csv('./Data/categoryMaping.csv')
-
-    # 将类别映射为新的类别。
-    NegativeFeature = NegativeFeature.join(CatrgoryMaping.set_index('category'), on='category', 
-                                        how='left', lsuffix='_left', rsuffix='_right')
-    NegativeFeature.drop(labels=['category'], axis=1, inplace=True)
-    # 原始数据(XXXXXX, X)，在转换类型的过程中有XXXX个空值。直接删除空值。
-    print(NegativeFeature['icategory'].isnull().sum())
-    print(NegativeFeature.shape)
-    NegativeFeature.dropna(inplace=True)
-    # 删除经纬度中非数字的行。
-    NegativeFeature['longitude'] = pd.to_numeric(NegativeFeature['longitude'], errors='coerce')
-    NegativeFeature['latitude'] = pd.to_numeric(NegativeFeature['latitude'], errors='coerce')
-    print(NegativeFeature.shape)
-
-    # 将icategory的类型强制转化为int型。
-    NegativeFeature['icategory'] = NegativeFeature['icategory'].astype(np.int16)
-    NegativeFeature['longitude'] = NegativeFeature['longitude'].astype(np.float16)
-    NegativeFeature['latitude'] = NegativeFeature['latitude'].astype(np.float16)
-    print(NegativeFeature.shape)
-    # NegativeFeature.head(3)
-
-    NegativeFeature.to_csv('./Data/NegativeFeatureDropInfor.csv')
-    return NegativeFeature
-
-# NegativeFeature = DropInforNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|')
-# NegativeFeature.head(3)
-
-def PreprocessNegativeFeature(FolderPath='./Data/origin', sep='\|\+\+\|'):
-    NegativeFeature = DropInforNegativeFeature(FolderPath='./Data/origin', sep='\|\+\+\|')
-    _, _, NegativeFeature['grid'] = GPS_to_grid(NegativeFeature['longitude'], NegativeFeature['latitude'], gGeoParameters)
-
-    NegativeFeature = clean_outofbounds(NegativeFeature, bounds = gBounds, col = ['longitude', 'latitude'])
-
-    print(NegativeFeature.shape)
-
-    df = NegativeFeature[['icategory', 'grid']].copy()
-    df['temp'] = 0
-    df = df.pivot_table(index='grid',columns='icategory', values='temp', aggfunc='count').fillna(0)
-    print(df.shape)
-
-    df.to_csv('./data/NegativeFeature.csv')
-    # df.sample(3)
-    return df
-
-# 暂时外部特征只有PoI特征，后期还会有其他的特征需要处理。
-def CombineRegionFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/', 
-                          FeatureSavePath='./Data/Output/Feature.csv'):
-    pass
 
 # --- 将特征附着到轨迹上 ---
 
@@ -1324,6 +1371,9 @@ def GetParameters(parametersPath='./Parameters.json'):
     global gGeoParameters
     global gPoIFolderPath
     global gPoIFeatureSavePath
+    global gPoISocialFeatureSavePath
+    global gPoIDropInforNegativelFeatureSavePath
+    global gPoINegativelFeatureSavePath
     global gRenameColumns
     global gFileterColumne
     global gSelectedColumne
@@ -1369,7 +1419,16 @@ def GetParameters(parametersPath='./Parameters.json'):
     # PoI特征输入目录。PoI文件夹的路径.
     gPoIFolderPath = Parameters['gPoIFolderPath']
     # 保存PoI特征的路径及文件名. Defaults to './Data/Output/PoIFeature.csv'.
+    # 这个是保存所有PoI特征合并之后的特征。
     gPoIFeatureSavePath = Parameters['gPoIFeatureSavePath']
+
+    # 保存社会信息的PoI特征。也就是北大开源的PoI特征。
+    gPoISocialFeatureSavePath = Parameters['gPoISocialFeatureSavePath']
+    # 去信息化的非社会信息的PoI特征保存路径。中间零时保存的信息。
+    gPoIDropInforNegativelFeatureSavePath = Parameters['gPoIDropInforNegativelFeatureSavePath']
+    # 非社会信息的PoI特征保存路径。需要去信息化的特征。
+    gPoINegativelFeatureSavePath = Parameters['gPoINegativelFeatureSavePath']
+
     gRenameColumns = dict(Parameters['gRenameColumns'])
     # print(gRenameColumns)
     gFileterColumne = list(Parameters['gFileterColumne'])
@@ -1422,9 +1481,11 @@ def GetParameters(parametersPath='./Parameters.json'):
     gOutputDataFormat = list(Parameters['gOutputDataFormat'])
 
 def GenerateGeoFeature(stayInterval=1800):
-    # consume 1 minter.
+    # consume 1 minute.
     startTime = datetime.datetime.now()
-    GetPoIFeature()
+    # GetPoIFeature()
+    # 生成并合并所有相关的PoI特征。
+    CombineMultiPoIFeatures()
     endTime1 = datetime.datetime.now()
     print("GetPoIFeature completed. {}".format(endTime1 - startTime))
 

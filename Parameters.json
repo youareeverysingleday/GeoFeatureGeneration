@@ -11,7 +11,10 @@
     "gActivityTime":900,
     "gSamplingIntervalRow": 0,
     "gPoIFolderPath": "./Data/BeiJing/",
-    "gPoIFeatureSavePath": "./Data/Output/MultipleFeatures/PoIFeature.csv",
+    "gPoIFeatureSavePath": "./Data/Output/PoIFeature.csv",
+    "gPoISocialFeatureSavePath":"./Data/Output/MultipleFeatures/SocialFeature.csv",
+    "gPoIDropInforNegativelFeatureSavePath":"./Data/Output/Temp/DropInforNegativeFeature.csv",
+    "gPoINegativelFeatureSavePath":"./Data/Output/MultipleFeatures/NegativeFeature.csv",
     "gRenameColumns": {
         "名称": "name",
         "大类": "category",
