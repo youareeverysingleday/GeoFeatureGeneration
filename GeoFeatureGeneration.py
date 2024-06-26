@@ -640,7 +640,6 @@ def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/'
         NegativeFeature = pd.read_csv(gPoINegativelFeatureSavePath, index_col=0)
     else:
         NegativeFeature = PreprocessNegativeFeature()
-    
     PartofPoIFeature = GetSocialPoIFeature()
     
     # 按区域编号进行拼接，也就是按行进行拼接。缺少的行填0。
@@ -878,6 +877,9 @@ def PreprocessTrajectory(userRange,
 
         ProcessPool = multiprocessing.Pool()
         result = ProcessPool.map(PreprocessSingleTrajectoryIndependent, userList)
+
+        ProcessPool.close()
+        ProcessPool.join()
     # 将所有用户的轨迹数据合并成为一个文件输出。
     elif outputType == 'merged':
         startTime = PrintStartInfo(functionName='PreprocessTrajectory')
@@ -938,17 +940,28 @@ def AttachFeaturetoTrajectory(outputType='merged'):
         userList = gUserList
         ProcessPool = multiprocessing.Pool()
         ProcessPool.map(AttachFeaturetoSingleUserTrajectory, userList)
+
+        ProcessPool.close()
+        ProcessPool.join()
     # 输出所有用户附着了特征之后的轨迹为一个文件。
     elif outputType == 'merged':
-        usersTrajectory = pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', index_col=0)
+        # usersTrajectory = pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', index_col=0)
         PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
         # 将index列赋值给一个新的grid列。
         PoIFeature['grid'] = PoIFeature.index
+        
+        meged_df = pd.DataFrame()
+        for chunk in pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', 
+                                 chunksize=500,
+                                 index_col=0):
+            merge_chunk = pd.merge(chunk, PoIFeature, on='grid', how='left').fillna(0)
+            meged_df = pd.concat([meged_df, merge_chunk])
+        # direct use merge can cause the memory explosion.
+        # usersTrajectory = usersTrajectory.merge(PoIFeature, 
+        #                                         on='grid', how='left').fillna(0)
 
-        usersTrajectory = usersTrajectory.merge(PoIFeature, 
-                                                on='grid', how='left').fillna(0)
-
-        usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
+        # usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
+        meged_df.to_csv(gAllUsersTrajectoryFeaturePath)
     PrintEndInfo(functionName='AttachFeaturetoTrajectory()', startTime=startTime)
 
 # --- 输出其他格式 ---
@@ -1161,6 +1174,9 @@ def GenerateStayMove(ProcessType = 'independent'):
         userList = gUserList
         ProcessPool = multiprocessing.Pool()
         ProcessPool.map(GenerateSingleUserStayMove, userList)
+
+        ProcessPool.close()
+        ProcessPool.join()
     # 处理所有用户整个处于一个csv中。效率比较低。推荐使用independent模式。
     elif ProcessType == 'merged':
         # Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
@@ -1187,6 +1203,9 @@ def GenerateStayMove(ProcessType = 'independent'):
                     chunksize=chunksize)
         ProcessPool = multiprocessing.Pool()
         results = ProcessPool.map(GenerateStayMoveByChunk, chunks)
+
+        ProcessPool.close()
+        ProcessPool.join()
 
         PrintEndInfo('GenerateStayMove() multiprocess completed.', startTime=startTime)
 
@@ -1431,9 +1450,11 @@ def GenerateGeoFeature(stayInterval=1800):
     # 生成交互矩阵需要使用所有用户在一个dataframe的形式。
     # 在生成轨迹特征的时候，单独处理一个dataframe效率太低，建议使用分别处理每个用户的形式。
     AttachFeaturetoTrajectory(outputType='independent')
+    endTime30 = datetime.datetime.now()
+    print("AttachFeaturetoTrajectory independent completed. {}".format(endTime30 - endTime2))
     AttachFeaturetoTrajectory(outputType='merged')
-    endTime3 = datetime.datetime.now()
-    print("AttachFeaturetoTrajectory completed. {}".format(endTime3 - endTime2))
+    endTime31 = datetime.datetime.now()
+    print("AttachFeaturetoTrajectory merged completed. {}".format(endTime31 - endTime2))
 
     # consume 1:26 .
     # 需要将区域外的地点都排除。
