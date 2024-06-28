@@ -927,7 +927,20 @@ def AttachFeaturetoSingleUserTrajectory(user):
     userTrajectory.to_csv(gSingleUserTrajectoryFeaturePath.format(user))
 
 
-def AttachFeaturetoTrajectory(outputType='merged'):
+
+def MergeUsersTrajectoryandPoIFeature(chunk):
+    PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
+    PoIFeature['grid'] = PoIFeature.index
+    # global gI
+    # gI += 1
+    # print(chunk.head(2))
+
+    # print(chunk.columns)
+    # print(PoIFeature.columns)
+    merge_chunk = pd.merge(chunk, PoIFeature, on='grid', how='left').fillna(0)
+    return merge_chunk
+
+def AttachFeaturetoTrajectory(outputType='merged', chunksize = 250):
     """_summary_
     将特征附着到所有用户的轨迹上。
     Args:
@@ -946,22 +959,35 @@ def AttachFeaturetoTrajectory(outputType='merged'):
     # 输出所有用户附着了特征之后的轨迹为一个文件。
     elif outputType == 'merged':
         # usersTrajectory = pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', index_col=0)
-        PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
+        # PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
         # 将index列赋值给一个新的grid列。
-        PoIFeature['grid'] = PoIFeature.index
+        # PoIFeature['grid'] = PoIFeature.index
+
+        usersTrajectory = pd.DataFrame()
+        chunks = pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', 
+                             index_col=0, 
+                             chunksize=chunksize)
+        ProcessPool = multiprocessing.Pool()
+        results = ProcessPool.map(MergeUsersTrajectoryandPoIFeature, chunks)
+
+        ProcessPool.close()
+        ProcessPool.join()
+
+        for result in results:
+            usersTrajectory = pd.concat([usersTrajectory, result])
+        usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
         
-        meged_df = pd.DataFrame()
-        for chunk in pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', 
-                                 chunksize=500,
-                                 index_col=0):
-            merge_chunk = pd.merge(chunk, PoIFeature, on='grid', how='left').fillna(0)
-            meged_df = pd.concat([meged_df, merge_chunk])
+        # meged_df = pd.DataFrame()
+        # for chunk in pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', 
+        #                          chunksize=500,
+        #                          index_col=0):
+        #     merge_chunk = pd.merge(chunk, PoIFeature, on='grid', how='left').fillna(0)
+        #     meged_df = pd.concat([meged_df, merge_chunk])
         # direct use merge can cause the memory explosion.
         # usersTrajectory = usersTrajectory.merge(PoIFeature, 
         #                                         on='grid', how='left').fillna(0)
 
-        # usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
-        meged_df.to_csv(gAllUsersTrajectoryFeaturePath)
+        # meged_df.to_csv(gAllUsersTrajectoryFeaturePath)
     PrintEndInfo(functionName='AttachFeaturetoTrajectory()', startTime=startTime)
 
 # --- 输出其他格式 ---
@@ -1336,6 +1362,9 @@ def GetParameters(parametersPath='./Parameters.json'):
     global gSingleUserStayMatrixSavePath
     global gAllUsersTrajectoriesFeatureMatrixSavePath
     global gOutputDataFormat
+
+    global gI
+    gI = 0
     
     # print(Parameters)
     # 研究地域范围。通过经纬度表示。
