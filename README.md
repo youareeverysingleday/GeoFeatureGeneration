@@ -7,6 +7,11 @@ This package can not run in jupyter, because package has used "mulitprocessing".
 
 这个包可以将数据处理为各种需要的格式输出。以满足多种模型对数据的需求。其中以统计型矩阵、类似于自然语言的矩阵和时序的形式为主。从而满足多种机器学习算法的需求。
 
+|number|city|Regional scope|
+|---|---|---|
+|1|北京经纬度范围|115.7, 39.4, 117.4, 41.6|
+|2|武汉经纬度范围|113.68, 29.97, 115.08, 31.37|
+
 ## publish information
 
 |number|publish time|version|modify content|
