@@ -448,7 +448,7 @@ def GenerateSingleSoicalPoIFeature(FilePath, fileParameters, GeoParameters, gSha
     # 将特征由中文全部转化为数值。
     df['category'] = df['category'].map(CategoryMapNumber)
     # 生成区域ID。
-    _, _, df['grid'] = GPS_to_grid(df['longitude'],df['latitude'], GeoParameters)
+    df['loncol'],df['latcol'], df['grid'] = GPS_to_grid(df['longitude'],df['latitude'], GeoParameters)
     # print('3')
     # 选取最终进行聚合的列。
     df = df[['category', 'grid']].copy()
@@ -605,7 +605,7 @@ def PreprocessNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|'):
         return None
 
     NegativeFeature = DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|')
-    _, _, NegativeFeature['grid'] = GPS_to_grid(NegativeFeature['longitude'], NegativeFeature['latitude'], gGeoParameters)
+    NegativeFeature['loncol'], NegativeFeature['latcol'], NegativeFeature['grid'] = GPS_to_grid(NegativeFeature['longitude'], NegativeFeature['latitude'], gGeoParameters)
 
     NegativeFeature = clean_outofbounds(NegativeFeature, bounds = gBounds, col = ['longitude', 'latitude'])
 
@@ -752,7 +752,7 @@ def PreprocessSingleTrajectoryIndependent(user):
     df_sampling.rename(columns={'lat': 'latitude', 'lng': 'longitude'}, inplace=True)
 
     # 生成区域ID。
-    _, _, df_sampling['grid'] = GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
+    df_sampling['loncol'], df_sampling['latcol'], df_sampling['grid'] = GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
     df_sampling['userID'] = user
 
     if gSaveUserTrajectoryFlag == True:
@@ -825,7 +825,7 @@ def PreprocessSingleTrajectoryMerged(user, sharedData, lock):
     df_sampling.rename(columns={'lat': 'latitude', 'lng': 'longitude'}, inplace=True)
 
     # 生成区域ID。
-    _, _, df_sampling['grid'] = GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
+    df_sampling['loncol'], df_sampling['latcol'], df_sampling['grid'] = GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
     df_sampling['userID'] = user
 
     if gSaveUserTrajectoryFlag == True:
