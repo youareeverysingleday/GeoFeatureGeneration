@@ -18,17 +18,19 @@ This package can not run in jupyter, because package has used "mulitprocessing".
 |---|---|---|---|
 |1|20240219|1.0.0|can output matrix of trajectory.|
 |2|20240409|1.0.1|output series of stay contain PoI feature.|
-|||||
+|3|20240625|1.0.2|generate negative PoI feature of area.|
+|4|20241024|1.0.3|because transbigdata package generate grid can't recover loncol and latcol, so use Cantor function to solve this problem.|
 |||||
 |||||
 |||||
 
 ## next plan
 
-1. 完成geo特征的合并，在输出数据结构的时候使用合并之后的Geo特征。
+1. ~~完成geo特征的合并，在输出数据结构的时候使用合并之后的Geo特征。~~
 2. move的特征需要特殊处理。因为move包含起点和终点，有两个地理特征。
 3. 需要统一的列名。不能在不同的函数中使用不同的列名。
 4. 输出图结构的数据。
+5. 使用cantor函数来生成唯一的grid编号。
 
 ## Function desrciption
 
@@ -50,6 +52,7 @@ This package can concat multi vectorized features to one matrix.
 
 .
 ├─README.md
+├─GenerateGeographicFeature.py # 由于transbigdata生成grid无法逆运算为行号和列号，所以使用其他的方式来生成grid的唯一值。对应的代码均需修改。
 ├─GeoFeatureGeneration.py
 ├─Parameters.json
 ├─Data
@@ -109,7 +112,7 @@ This package can concat multi vectorized features to one matrix.
 |4|geopandas||
 |5|json||
 |6|datetime||
-|7|||
+|7|transbigdata||
 |8|||
 ||||
 
