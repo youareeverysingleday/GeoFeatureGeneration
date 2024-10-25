@@ -1,4 +1,5 @@
 # GeoFeatureGeneration
+
 generate various geographic characteristic/feature from PoI or other origin.
 
 This package can not run in jupyter, because package has used "mulitprocessing".
@@ -7,22 +8,22 @@ This package can not run in jupyter, because package has used "mulitprocessing".
 
 这个包可以将数据处理为各种需要的格式输出。以满足多种模型对数据的需求。其中以统计型矩阵、类似于自然语言的矩阵和时序的形式为主。从而满足多种机器学习算法的需求。
 
-|number|city|Regional scope|
-|---|---|---|
-|1|北京经纬度范围|115.7, 39.4, 117.4, 41.6|
-|2|武汉经纬度范围|113.68, 29.97, 115.08, 31.37|
+| number | city           | Regional scope               | description                       |
+| ------ | -------------- | ---------------------------- | --------------------------------- |
+| 1      | 北京经纬度范围 | 115.7, 39.4, 117.4, 41.6     | 北京目前之后北京大学提供的PoI数据 |
+| 2      | 武汉经纬度范围 | 113.68, 29.97, 115.08, 31.37 | ......                          |
 
 ## publish information
 
-|number|publish time|version|modify content|
-|---|---|---|---|
-|1|20240219|1.0.0|can output matrix of trajectory.|
-|2|20240409|1.0.1|output series of stay contain PoI feature.|
-|3|20240625|1.0.2|generate negative PoI feature of area.|
-|4|20241024|1.0.3|because transbigdata package generate grid can't recover loncol and latcol, so use Cantor function to solve this problem.|
-|||||
-|||||
-|||||
+| number | publish time | version | modify content                                                                                                            |
+| ------ | ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 1      | 20240219     | 1.0.0   | can output matrix of trajectory.                                                                                          |
+| 2      | 20240409     | 1.0.1   | output series of stay contain PoI feature.                                                                                |
+| 3      | 20240625     | 1.0.2   | generate negative PoI feature of area.                                                                                    |
+| 4      | 20241024     | 1.0.3   | because transbigdata package generate grid can't recover loncol and latcol, so use Cantor function to solve this problem. |
+|        |              |         |                                                                                                                           |
+|        |              |         |                                                                                                                           |
+|        |              |         |                                                                                                                           |
 
 ## next plan
 
@@ -39,7 +40,6 @@ the target is to process the data into a format that enters machine learning.
 This package can concat multi vectorized features to one matrix.
 
 ![project flow chart](./Pictures/FlowChart.png "project flow chart")
-
 
 ### output data structure
 
@@ -91,38 +91,36 @@ This package can concat multi vectorized features to one matrix.
 │      └─MultipleFeatures
 └─Test
 
-
-
 ## Output format describe
 
-|num|format|describe|
-|---|---|---|
-|1|statistical matrix|mainly used for collaborative filtering or matrix factorization.|
-|2|language matrix|mainly used for deep learning.|
-|3|time series|mainly used for LSTM or others.|
-|4|||
+| num | format             | describe                                                         |
+| --- | ------------------ | ---------------------------------------------------------------- |
+| 1   | statistical matrix | mainly used for collaborative filtering or matrix factorization. |
+| 2   | language matrix    | mainly used for deep learning.                                   |
+| 3   | time series        | mainly used for LSTM or others.                                  |
+| 4   |                    |                                                                  |
 
 ## Package dependence
 
-|num|package|version|
-|---|---|---|
-|1|pandas||
-|2|numpy||
-|3|multiprocessing/python|>=3.9|
-|4|geopandas||
-|5|json||
-|6|datetime||
-|7|transbigdata||
-|8|||
-||||
+| num | package                | version |
+| --- | ---------------------- | ------- |
+| 1   | pandas                 |         |
+| 2   | numpy                  |         |
+| 3   | multiprocessing/python | >=3.9   |
+| 4   | geopandas              |         |
+| 5   | json                   |         |
+| 6   | datetime               |         |
+| 7   | transbigdata           |         |
+| 8   |                        |         |
+|     |                        |         |
 
 ## Test dataset
 
-|num|data name|source|
-|---|---|---|
-|1|Microsoft GeoLife 1.3|[Geolife GPS trajectory dataset – User Guide](https://www.microsoft.com/en-us/research/publication/geolife-gps-trajectory-dataset-user-guide/)|
-|2|BeiJing PoI feature|Geographic  Data Sharing Infrastructure, College of Urban and  Environmental Science, Peking University (http://geodata.pku.edu.cn)|
-|3|||
-|4|||
-|5|||
-|6|||
+| num | data name             | source                                                                                                                                       |
+| --- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Microsoft GeoLife 1.3 | [Geolife GPS trajectory dataset – User Guide](https://www.microsoft.com/en-us/research/publication/geolife-gps-trajectory-dataset-user-guide/) |
+| 2   | BeiJing PoI feature   | Geographic  Data Sharing Infrastructure, College of Urban and  Environmental Science, Peking University (http://geodata.pku.edu.cn)          |
+| 3   |                       |                                                                                                                                              |
+| 4   |                       |                                                                                                                                              |
+| 5   |                       |                                                                                                                                              |
+| 6   |                       |                                                                                                                                              |

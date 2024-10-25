@@ -587,6 +587,7 @@ def DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|'):
 
     # 单纯的数字不适合做分类名称，所以前面加一个标识nf_。表示nagetive feature的意思。
     NegativeFeature = NegativeFeature.apply(AddStringIncolumn, columnName='icategory', content='nf_', axis=1)
+    NegativeFeature['category'] = NegativeFeature['icategory']
     NegativeFeature.drop(labels=['icategory'], axis=1, inplace=True)
 
     print(NegativeFeature.shape)

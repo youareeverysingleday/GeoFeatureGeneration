@@ -13,6 +13,7 @@
     "gSamplingIntervalRow": 0,
     "gPoIFolderPath": "./Data/BeiJing/",
     "gPoIFeatureSavePath": "./Data/Output/PoIFeature.csv",
+    "gAreaGriddingFeatureSavePath": "./Data/Output/GriddingFeature.csv",
     "gPoISocialFeatureSavePath":"./Data/Output/MultipleFeatures/SocialFeature.csv",
     "gPoIDropInforNegativelFeatureSavePath":"./Data/Output/Temp/DropInforNegativeFeature.csv",
     "gPoINegativelFeatureSavePath":"./Data/Output/MultipleFeatures/NegativeFeature.csv",
