@@ -72,7 +72,7 @@ def CantorPairingInverseFunction(z):
     x = w - y
     return int(x), int(y)
 
-def GenerateGrid(df):
+def GenerateGridByLongitudeLatitude(df):
     """_summary_
     将 康托 配对函数应用到dataframe上，生成grid。
     Args:
@@ -81,7 +81,25 @@ def GenerateGrid(df):
     Returns:
         _type_: _description_
     """
-    df['grid'] = CantorPairingFunction(df['loncol'], df['latcol'])
+    print('-----2-----{}'.format(df['LONCOL']))
+    # print('-----1-----{}'.format(df.colums))
+    
+    # loncol, latcol = tbd.GPS_to_grid(df['lon'], df['lat'], gGeoParameters)
+    
+    df['grid'] = CantorPairingFunction(df['LONCOL'], df['LATCOL'])
+    print('-----2.1-----{}'.format(df['grid']))
+    return df
+
+def GenerateGrid(df, lonColName='loncol', latColName='latcol'):
+    """_summary_
+    将 康托 配对函数应用到dataframe上，生成grid。
+    Args:
+        df (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    df['grid'] = CantorPairingFunction(df[lonColName], df[latColName])
     return df
 
 def RecoverLoncolLatcol(df):
@@ -323,9 +341,7 @@ def GetSocialPoIFeature():
     # 文件相关参数。
     fileParameters = {'renameColumns':gRenameColumns, 'FileterColumne':gFileterColumne, 'SelectedColumne':gSelectedColumne,
                       'CategoryMapNumber':gCategoryMapNumber}
-    # 地理特征参数。
-    gGeoParameters = tbd.area_to_params(gBounds, accuracy = 1000, method='rect')
-    
+        
     # maxloncol = gGeoParameters['maxloncol']
     # maxlatcol = gGeoParameters['maxlatcol']
     
@@ -528,7 +544,8 @@ def GetEntireTime(df):
         pd.Timestamp(datetime.datetime.strptime((df['date'] + ' ' + df['time']),'%Y-%m-%d %H:%M:%S'))
     return df
 
-def GenerateTimeFeature(df, col='entireTime'):
+# entireTime
+def GenerateTimeFeature(df, col='stime'):
     """_summary_
     生成时间特征。。提供给pandas apply使用的。
     Args:
@@ -593,7 +610,7 @@ def PreprocessSingleTrajectoryIndependent(user):
         df_sampling = df.copy()
     
     # df.shape()：
-    print ('Total GPS points: ' + str(df_sampling.shape[0]))
+    # print ('Total GPS points: ' + str(df_sampling.shape[0]))
 
     # 生成完整的时间列。
     # df_sampling = df_sampling.apply(GetEntireTime, axis=1)
@@ -667,7 +684,7 @@ def PreprocessSingleTrajectoryMerged(user, sharedData, lock):
         df_sampling = df.copy()
     
     # df.shape()：
-    print ('Total GPS points: ' + str(df_sampling.shape[0]))
+    # print ('Total GPS points: ' + str(df_sampling.shape[0]))
 
     # 生成完整的时间列。
     # df_sampling = df_sampling.apply(GetEntireTime, axis=1)
@@ -988,7 +1005,7 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128,
         # 保存。
         np_3d_to_csv(result, gSingleUserStayMatrixSavePath.format(user))
 
-    print('{} SeriesToMatrix have completed.'.format(user))
+    print('{} SeriesToMatrix have completed. FeatureThirdDimension is {}'.format(user, FeatureThirdDimension))
     return result, FeatureThirdDimension
 
 def GenerateSingleUserStayMove(user):
@@ -1010,12 +1027,22 @@ def GenerateSingleUserStayMove(user):
 
     stay, move = tbd.traj_stay_move(userTrajectory, 
                                 gGeoParameters,
-                                col=['userID', 'entireTime', 'longitude', 'latitude', 'grid'], 
+                                col=['userID', 'entireTime', 'longitude', 'latitude'], 
                                 activitytime=gActivityTime)
     
+
+    # print(stay.columns)
+    print('-----0-----{}'.format(stay.columns))
+    # print(type(stay))
+    
+    # 生成grid。
+    stay = stay.apply(GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
+    move = move.apply(GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
+    print('-----3-----{}'.format(stay.columns))
     # 生成时间特征。时间戳的特征也会在后面获取。
     stay = stay.apply(GenerateTimeFeature, axis=1)
     move = move.apply(GenerateTimeFeature, axis=1)
+    print('-----4-----{}'.format(stay.columns))
 
     # 读取所有特征。
     PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
@@ -1039,11 +1066,17 @@ def GenerateStayMoveByChunk(chunk):
         chunk = tbd.clean_outofbounds(chunk, gBounds, col=['longitude', 'latitude'])
     
     # user stay and move to decide sentence length .
+    # , 'grid'
     stay, move = tbd.traj_stay_move(chunk, 
                                 gGeoParameters,
-                                col=['userID', 'entireTime', 'longitude', 'latitude', 'grid'],
+                                col=['userID', 'entireTime', 'longitude', 'latitude'],
                                 activitytime=gActivityTime)
-    
+    # print('-----0.2-----{}'.format(stay.columns))
+    # 生成grid。
+    # stay = stay.apply(GenerateGridByLongitudeLatitude, axis=1)
+    # move = move.apply(GenerateGridByLongitudeLatitude, axis=1)
+    stay = stay.apply(GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
+    move = move.apply(GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
     # 需要生成时间特征。
     stay = stay.apply(GenerateTimeFeature, col='etime', axis=1)
     move = move.apply(GenerateTimeFeature, col='etime', axis=1)
@@ -1140,7 +1173,7 @@ def GenerateSingleUserFeatureMatrix(user, shareData, lock):
                                          interval='M', 
                                          maxrow=gMaxRow)
 
-# gFeatureThirdDimension = 0
+gFeatureThirdDimension = 0
 
 def GenerateFeatureMatrix(ProcessType = 'independent'):
     startTime = PrintStartInfo('GenerateFeatureMatrix()')
@@ -1158,6 +1191,8 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
 
         ProcessPool.close()
         ProcessPool.join()
+        gFeatureThirdDimension = ShareData.dat
+        print('gFeatureThirdDimension {}'.format(gFeatureThirdDimension))
 
         # global gFeatureThirdDimension
         # gFeatureThirdDimension = ShareData.dat.shape[2]
@@ -1168,9 +1203,11 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
 
 def CombineUsersMatrix():
 
-    stay = pd.read_csv(gSingleUserStaySavePath.format(gUserList[0]), index_col=0)
+    # stay = pd.read_csv(gSingleUserStaySavePath.format(gUserList[0]), index_col=0)
     # FeatureThirdDimension = stay.shape[1] - len(dropColunms)
-    FeatureThirdDimension = 18
+    # 18
+    FeatureThirdDimension = gFeatureThirdDimension
+    print('FeatureThirdDimension {}'.format(FeatureThirdDimension))
     FeatureShape = (-1, gMaxRow, FeatureThirdDimension)
     # print('CombineUsersMatrix start. FeatureShape is {}'.format(FeatureShape))
     # 所有用户的轨迹特征存储。
