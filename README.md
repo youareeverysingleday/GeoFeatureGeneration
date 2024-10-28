@@ -124,3 +124,708 @@ This package can concat multi vectorized features to one matrix.
 | 4   |                       |                                                                                                                                              |
 | 5   |                       |                                                                                                                                              |
 | 6   |                       |                                                                                                                                              |
+
+
+
+
+生成地理特征代码中的打印，用于观测生成过程中的数据的形状变化情况。
+```log
+GeoFeatureGeneration$ /bin/python3 /workspace/codespace/GeoFeatureGeneration/GenerateGeographicFeature.py
+Start function: GetSocialPoIFeature() ,pid: 63465 ,start at: 2024-10-28 17:32:24 .
+./Data/Output/MultipleFeatures/SocialFeature.csv is exist, will overwrite.
+End function: GetSocialPoIFeature() ,pid: 63465 ,completed time: 2024-10-28 17:33:54.495347 ,
+            consume time: 0:01:29.798224 .
+./Data/Output/PoIFeature.csv is exist, it will overwrite.
+
+ Output PoI feature shape is (9062, 14). columns Index([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
+       13.0],
+      dtype='float64').
+
+GetPoIFeature completed. 0:01:29.900888
+Start function: PreprocessTrajectory ,pid: 63465 ,start at: 2024-10-28 17:33:54 .
+
+ Output all user trajectory shape is (1679880, 8). in this time, hast attach PoI feature.
+
+End function: PreprocessTrajectory ,pid: 63465 ,completed time: 2024-10-28 17:39:02.397124 ,
+            consume time: 0:05:07.799052 .
+PreprocessTrajectory completed. 0:05:07.846082
+Start function: AttachFeaturetoTrajectory() ,pid: 63465 ,start at: 2024-10-28 17:39:02 .
+
+ 1 009 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 002 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 003 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 005 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+
+
+
+
+ 1 008 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 007 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 006 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 000 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 001 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+
+ 1 004 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+
+
+
+
+
+ 1 006 UserTrajectory shape is (28307, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 008 UserTrajectory shape is (77876, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 009 UserTrajectory shape is (84567, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 007 UserTrajectory shape is (87163, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 005 UserTrajectory shape is (101187, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 001 UserTrajectory shape is (108536, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 000 UserTrajectory shape is (157482, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 002 UserTrajectory shape is (223401, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 004 UserTrajectory shape is (393368, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 003 UserTrajectory shape is (417993, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+End function: AttachFeaturetoTrajectory() ,pid: 63465 ,completed time: 2024-10-28 17:39:08.799583 ,
+            consume time: 0:00:06.355439 .
+AttachFeaturetoTrajectory independent completed. 0:00:06.356748
+Start function: AttachFeaturetoTrajectory() ,pid: 63465 ,start at: 2024-10-28 17:39:08 .
+
+ User trajectory feature shape is (1679880, 22) after attach PoI feature. 
+
+End function: AttachFeaturetoTrajectory() ,pid: 63465 ,completed time: 2024-10-28 17:47:47.955794 ,
+            consume time: 0:08:39.154943 .
+AttachFeaturetoTrajectory merged completed. 0:08:45.731829
+Start function: GenerateInteractionMatrix() ,pid: 63465 ,start at: 2024-10-28 17:47:48 .
+End function: GenerateInteractionMatrix() ,pid: 63465 ,completed time: 2024-10-28 17:47:52.022463 ,
+            consume time: 0:00:03.846474 .
+GenerateInteractionMatrix completed. 0:00:03.860163
+Start function: GenerateStayMove() ,pid: 63465 ,start at: 2024-10-28 17:47:52 .
+
+ 2 006 UserTrajectory shape is (28307, 22). 
+
+
+ 2 006 stay shape is (55, 9). 
+
+
+ 2 008 UserTrajectory shape is (77876, 22). 
+
+
+ 2.1 006 stay shape is (55, 10). 
+
+
+ 2 007 UserTrajectory shape is (87163, 22). 
+
+
+ 2 009 UserTrajectory shape is (84567, 22). 
+
+
+ 2 005 UserTrajectory shape is (101187, 22). 
+
+
+ 2 008 stay shape is (86, 9). 
+
+
+ 2 001 UserTrajectory shape is (108536, 22). 
+
+
+ 2 007 stay shape is (180, 9). 
+
+
+ 2 009 stay shape is (107, 9). 
+
+
+ 2.1 008 stay shape is (86, 10). 
+
+
+ 2 005 stay shape is (209, 9). 
+
+
+ 2 000 UserTrajectory shape is (157482, 22). 
+
+
+ 2 001 stay shape is (140, 9). 
+
+
+ 2.1 009 stay shape is (107, 10). 
+
+
+ 2.1 007 stay shape is (180, 10). 
+
+
+ 2.2 006 stay shape is (55, 16). 
+
+
+ 2 002 UserTrajectory shape is (223401, 22). 
+
+2 Output single user stay shape is (55, 30).
+006 feature has completed.
+
+ 2 000 stay shape is (497, 9). 
+
+
+ 2.1 005 stay shape is (209, 10). 
+
+
+ 2.1 001 stay shape is (140, 10). 
+
+
+ 2 002 stay shape is (348, 9). 
+
+
+ 2.2 008 stay shape is (86, 16). 
+
+2 Output single user stay shape is (86, 30).
+008 feature has completed.
+
+ 2 004 UserTrajectory shape is (393368, 22). 
+
+
+ 2 003 UserTrajectory shape is (417993, 22). 
+
+
+ 2.2 009 stay shape is (107, 16). 
+
+2 Output single user stay shape is (107, 30).
+009 feature has completed.
+
+ 2.1 000 stay shape is (497, 10). 
+
+
+ 2.1 002 stay shape is (348, 10). 
+
+
+ 2 004 stay shape is (1218, 9). 
+
+
+ 2.2 001 stay shape is (140, 16). 
+
+
+ 2 003 stay shape is (1038, 9). 
+
+2 Output single user stay shape is (140, 30).
+001 feature has completed.
+
+ 2.2 007 stay shape is (180, 16). 
+
+2 Output single user stay shape is (180, 30).
+007 feature has completed.
+
+ 2.2 005 stay shape is (209, 16). 
+
+2 Output single user stay shape is (209, 30).
+005 feature has completed.
+
+ 2.1 003 stay shape is (1038, 10). 
+
+
+ 2.1 004 stay shape is (1218, 10). 
+
+
+ 2.2 002 stay shape is (348, 16). 
+
+2 Output single user stay shape is (348, 30).
+002 feature has completed.
+
+ 2.2 000 stay shape is (497, 16). 
+
+2 Output single user stay shape is (497, 30).
+000 feature has completed.
+
+ 2.2 003 stay shape is (1038, 16). 
+
+2 Output single user stay shape is (1038, 30).
+003 feature has completed.
+
+ 2.2 004 stay shape is (1218, 16). 
+
+2 Output single user stay shape is (1218, 30).
+004 feature has completed.
+End function: GenerateStayMove() ,pid: 63465 ,completed time: 2024-10-28 17:48:05.637571 ,
+            consume time: 0:00:13.601459 .
+Start function: GenerateStayMove() ,pid: 63465 ,start at: 2024-10-28 17:48:05 .
+End function: GenerateStayMove() multiprocess completed. ,pid: 63465 ,completed time: 2024-10-28 17:48:15.678716 ,
+            consume time: 0:00:10.039817 .
+Output all users stays shape is (3902, 30).
+End function: GenerateStayMove() ,pid: 63465 ,completed time: 2024-10-28 17:48:15.866133 ,
+            consume time: 0:00:10.227228 .
+GenerateStayMove completed. 0:00:23.831849
+Start function: GenerateFeatureMatrix() ,pid: 63465 ,start at: 2024-10-28 17:48:15 .
+3 stay shape (86, 30)
+3.1 stay shape (86, 31)
+008 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (55, 30)
+3.1 stay shape (55, 31)
+006 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (140, 30)
+3.1 stay shape (140, 31)
+001 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (209, 30)
+3.1 stay shape (209, 31)
+005 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (107, 30)
+3.1 stay shape (107, 31)
+009 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (348, 30)
+3.1 stay shape (348, 31)
+002 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (497, 30)
+3.1 stay shape (497, 31)
+000 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (1218, 30)
+3.1 stay shape (1218, 31)
+004 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (1038, 30)
+3.1 stay shape (1038, 31)
+003 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (180, 30)
+3.1 stay shape (180, 31)
+007 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+--- gFeatureThirdDimension 26
+End function: GenerateFeatureMatrix() ,pid: 63465 ,completed time: 2024-10-28 17:48:16.873901 ,
+            consume time: 0:00:01.005952 .
+GenerateFeatureMatrix completed. 0:00:01.033426
+--ooo- gFeatureThirdDimension 0
+FeatureThirdDimension 25, gFeatureThirdDimension 0
+Traceback (most recent call last):
+  File "/workspace/codespace/GeoFeatureGeneration/GenerateGeographicFeature.py", line 1292, in <module>
+    GenerateGeoFeature()
+  File "/workspace/codespace/GeoFeatureGeneration/GenerateGeographicFeature.py", line 1283, in GenerateGeoFeature
+    CombineUsersMatrix()
+  File "/workspace/codespace/GeoFeatureGeneration/GenerateGeographicFeature.py", line 1225, in CombineUsersMatrix
+    userFeature = np_3d_read_csv(gSingleUserStayMatrixSavePath.format(user), shape=FeatureShape)
+  File "/workspace/codespace/GeoFeatureGeneration/GenerateGeographicFeature.py", line 916, in np_3d_read_csv
+    a = a2d.reshape(shape)
+ValueError: cannot reshape array of size 16640 into shape (128,25)
+(base) engineer@engineer-GPU00:/workspace/codespace/GeoFeatureGeneration$ cd /workspace/codespace/GeoFeatureGeneration
+/bin/python3 /workspace/codespace/GeoFeatureGenera(base) engineer@engineer-GPU00:/workspace/codespace/GeoFeatureGeneration$ /bin/python3 /workspace/codespace/GeoFeatureGeneration/GenerateGeographicFeature.py
+Start function: GetSocialPoIFeature() ,pid: 68720 ,start at: 2024-10-28 17:51:25 .
+./Data/Output/MultipleFeatures/SocialFeature.csv is exist, will overwrite.
+End function: GetSocialPoIFeature() ,pid: 68720 ,completed time: 2024-10-28 17:52:55.877729 ,
+            consume time: 0:01:30.502298 .
+./Data/Output/PoIFeature.csv is exist, it will overwrite.
+
+ Output PoI feature shape is (9062, 14). columns Index([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
+       13.0],
+      dtype='float64').
+
+GetPoIFeature completed. 0:01:30.612127
+Start function: PreprocessTrajectory ,pid: 68720 ,start at: 2024-10-28 17:52:55 .
+
+ Output all user trajectory shape is (1679880, 8). in this time, hast attach PoI feature.
+
+End function: PreprocessTrajectory ,pid: 68720 ,completed time: 2024-10-28 17:58:06.391858 ,
+            consume time: 0:05:10.404230 .
+PreprocessTrajectory completed. 0:05:10.451671
+Start function: AttachFeaturetoTrajectory() ,pid: 68720 ,start at: 2024-10-28 17:58:06 .
+
+ 1 007 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 002 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 005 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 006 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 004 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 008 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 003 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 009 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 001 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+ 1 000 PoIFeature shape is (9062, 15). columns Index(['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0',
+       '10.0', '11.0', '12.0', '13.0', 'grid'],
+      dtype='object').
+
+
+
+
+
+
+
+
+
+
+
+ 1 006 UserTrajectory shape is (28307, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 008 UserTrajectory shape is (77876, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 009 UserTrajectory shape is (84567, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 007 UserTrajectory shape is (87163, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 005 UserTrajectory shape is (101187, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 001 UserTrajectory shape is (108536, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 000 UserTrajectory shape is (157482, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 002 UserTrajectory shape is (223401, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 004 UserTrajectory shape is (393368, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+
+ 1 003 UserTrajectory shape is (417993, 22). columns Index(['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol',
+       'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0',
+       '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0'],
+      dtype='object').
+
+End function: AttachFeaturetoTrajectory() ,pid: 68720 ,completed time: 2024-10-28 17:58:12.830981 ,
+            consume time: 0:00:06.391711 .
+AttachFeaturetoTrajectory independent completed. 0:00:06.393024
+Start function: AttachFeaturetoTrajectory() ,pid: 68720 ,start at: 2024-10-28 17:58:12 .
+
+ User trajectory feature shape is (1679880, 22) after attach PoI feature. 
+
+End function: AttachFeaturetoTrajectory() ,pid: 68720 ,completed time: 2024-10-28 18:06:53.067720 ,
+            consume time: 0:08:40.235459 .
+AttachFeaturetoTrajectory merged completed. 0:08:46.848839
+Start function: GenerateInteractionMatrix() ,pid: 68720 ,start at: 2024-10-28 18:06:53 .
+End function: GenerateInteractionMatrix() ,pid: 68720 ,completed time: 2024-10-28 18:06:57.168352 ,
+            consume time: 0:00:03.880209 .
+GenerateInteractionMatrix completed. 0:00:03.896630
+Start function: GenerateStayMove() ,pid: 68720 ,start at: 2024-10-28 18:06:57 .
+
+ 2 006 UserTrajectory shape is (28307, 22). 
+
+
+ 2 006 stay shape is (55, 9). 
+
+
+ 2 008 UserTrajectory shape is (77876, 22). 
+
+
+ 2 009 UserTrajectory shape is (84567, 22). 
+
+
+ 2 007 UserTrajectory shape is (87163, 22). 
+
+
+ 2.1 006 stay shape is (55, 10). 
+
+
+ 2 005 UserTrajectory shape is (101187, 22). 
+
+
+ 2 001 UserTrajectory shape is (108536, 22). 
+
+
+ 2 008 stay shape is (86, 9). 
+
+
+ 2 009 stay shape is (107, 9). 
+
+
+ 2 007 stay shape is (180, 9). 
+
+
+ 2.1 008 stay shape is (86, 10). 
+
+
+ 2 001 stay shape is (140, 9). 
+
+
+ 2 005 stay shape is (209, 9). 
+
+
+ 2.1 009 stay shape is (107, 10). 
+
+
+ 2 000 UserTrajectory shape is (157482, 22). 
+
+
+ 2.1 007 stay shape is (180, 10). 
+
+
+ 2.2 006 stay shape is (55, 16). 
+
+2 Output single user stay shape is (55, 30).
+006 feature has completed.
+
+ 2.1 001 stay shape is (140, 10). 
+
+
+ 2 002 UserTrajectory shape is (223401, 22). 
+
+
+ 2 000 stay shape is (497, 9). 
+
+
+ 2.1 005 stay shape is (209, 10). 
+
+
+ 2 002 stay shape is (348, 9). 
+
+
+ 2.2 008 stay shape is (86, 16). 
+
+2 Output single user stay shape is (86, 30).
+008 feature has completed.
+
+ 2 004 UserTrajectory shape is (393368, 22). 
+
+
+ 2.2 009 stay shape is (107, 16). 
+
+2 Output single user stay shape is (107, 30).
+009 feature has completed.
+
+ 2 003 UserTrajectory shape is (417993, 22). 
+
+
+ 2.1 000 stay shape is (497, 10). 
+
+
+ 2.1 002 stay shape is (348, 10). 
+
+
+ 2 004 stay shape is (1218, 9). 
+
+
+ 2.2 001 stay shape is (140, 16). 
+
+2 Output single user stay shape is (140, 30).
+001 feature has completed.
+
+ 2.2 007 stay shape is (180, 16). 
+
+
+ 2 003 stay shape is (1038, 9). 
+
+2 Output single user stay shape is (180, 30).
+007 feature has completed.
+
+ 2.2 005 stay shape is (209, 16). 
+
+2 Output single user stay shape is (209, 30).
+005 feature has completed.
+
+ 2.1 004 stay shape is (1218, 10). 
+
+
+ 2.1 003 stay shape is (1038, 10). 
+
+
+ 2.2 002 stay shape is (348, 16). 
+
+2 Output single user stay shape is (348, 30).
+002 feature has completed.
+
+ 2.2 000 stay shape is (497, 16). 
+
+2 Output single user stay shape is (497, 30).
+000 feature has completed.
+
+ 2.2 003 stay shape is (1038, 16). 
+
+2 Output single user stay shape is (1038, 30).
+003 feature has completed.
+
+ 2.2 004 stay shape is (1218, 16). 
+
+2 Output single user stay shape is (1218, 30).
+004 feature has completed.
+End function: GenerateStayMove() ,pid: 68720 ,completed time: 2024-10-28 18:07:10.691792 ,
+            consume time: 0:00:13.507059 .
+Start function: GenerateStayMove() ,pid: 68720 ,start at: 2024-10-28 18:07:10 .
+End function: GenerateStayMove() multiprocess completed. ,pid: 68720 ,completed time: 2024-10-28 18:07:20.424794 ,
+            consume time: 0:00:09.731688 .
+Output all users stays shape is (3902, 30).
+End function: GenerateStayMove() ,pid: 68720 ,completed time: 2024-10-28 18:07:20.616948 ,
+            consume time: 0:00:09.923833 .
+GenerateStayMove completed. 0:00:23.434017
+Start function: GenerateFeatureMatrix() ,pid: 68720 ,start at: 2024-10-28 18:07:20 .
+3 stay shape (140, 30)
+3.1 stay shape (140, 31)
+001 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (86, 30)
+3.1 stay shape (86, 31)
+008 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (497, 30)
+3.1 stay shape (497, 31)
+000 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (209, 30)
+3.1 stay shape (209, 31)
+005 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (55, 30)
+3.1 stay shape (55, 31)
+006 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (348, 30)
+3.1 stay shape (348, 31)
+002 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (107, 30)
+3.1 stay shape (107, 31)
+009 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (180, 30)
+3.1 stay shape (180, 31)
+007 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (1218, 30)
+3.1 stay shape (1218, 31)
+004 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+3 stay shape (1038, 30)
+3.1 stay shape (1038, 31)
+003 SeriesToMatrix have completed. FeatureThirdDimension is 26
+--- shareData.dat 26
+--- gFeatureThirdDimension 26
+End function: GenerateFeatureMatrix() ,pid: 68720 ,completed time: 2024-10-28 18:07:21.625091 ,
+            consume time: 0:00:01.006364 .
+GenerateFeatureMatrix completed. 0:00:01.033304
+--ooo- gFeatureThirdDimension 0
+FeatureThirdDimension 26, gFeatureThirdDimension 0
+CombineUsersMatrix has completed.
+CombineUsersMatrix completed. 0:00:00.150205
+All completed. 0:15:56.426793
+
+
+```

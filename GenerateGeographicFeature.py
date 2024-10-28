@@ -23,14 +23,14 @@ def AddStringIncolumn(df, columnName, content):
 
 def PrintStartInfo(functionName, description=''):
     startTime = datetime.datetime.now()
-    print('Start function: {} ,\n  pid: {} ,\n  start at: {} .'.
+    print('Start function: {} ,pid: {} ,start at: {} .'.
           format(functionName, os.getpid(), startTime.strftime('%Y-%m-%d %H:%M:%S')))
     if description != '':
         print(description)
     return startTime
 
 def PrintEndInfo(functionName, startTime, description=''):
-    print('End function: {} ,\n  pid: {} ,\n  completed time: {} ,\n  \
+    print('End function: {} ,pid: {} ,completed time: {} ,\n  \
           consume time: {} .'.format(functionName, os.getpid(),
                                      datetime.datetime.now(), 
                                      datetime.datetime.now() - startTime))
@@ -71,24 +71,6 @@ def CantorPairingInverseFunction(z):
     y = z - t
     x = w - y
     return int(x), int(y)
-
-def GenerateGridByLongitudeLatitude(df):
-    """_summary_
-    将 康托 配对函数应用到dataframe上，生成grid。
-    Args:
-        df (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    print('-----2-----{}'.format(df['LONCOL']))
-    # print('-----1-----{}'.format(df.colums))
-    
-    # loncol, latcol = tbd.GPS_to_grid(df['lon'], df['lat'], gGeoParameters)
-    
-    df['grid'] = CantorPairingFunction(df['LONCOL'], df['LATCOL'])
-    print('-----2.1-----{}'.format(df['grid']))
-    return df
 
 def GenerateGrid(df, lonColName='loncol', latColName='latcol'):
     """_summary_
@@ -160,6 +142,9 @@ def GetParameters(parametersPath='./Parameters.json'):
     global gSingleUserStayMatrixSavePath
     global gAllUsersTrajectoriesFeatureMatrixSavePath
     global gOutputDataFormat
+
+    # set 3D data dimension number.
+    global gFeatureThirdDimension
 
     global gI
     gI = 0
@@ -263,6 +248,8 @@ def GetParameters(parametersPath='./Parameters.json'):
 
     # select output data format.
     gOutputDataFormat = list(Parameters['gOutputDataFormat'])
+
+    gFeatureThirdDimension = 0
     
 ## 生成公开数据集的PoI特征
 
@@ -396,7 +383,7 @@ def DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|'):
                             dtype={'ID':str, 'category':str, 'subcategory':str}, engine='python')
         NegativeFeature = pd.concat([NegativeFeature, temp], ignore_index=True)
 
-    print(NegativeFeature.shape)
+    # print(NegativeFeature.shape)
     print('NegativeFeature memory usage is {} MB.'.format(NegativeFeature.memory_usage().sum()/(1024.0 ** 2)))
     # 按照ID去重。
     NegativeFeature.drop_duplicates(subset='ID', keep='first', inplace=True)
@@ -515,11 +502,14 @@ def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/'
 
     if os.path.exists(gPoIFeatureSavePath) == True:
         print('{} is exist, it will overwrite.'.format(gPoIFeatureSavePath))
-
+    
+    # print('\n Output PoI feature shape is {}. columns {}.\n'.format(PoIFeature.shape, PoIFeature.columns))
     PoIFeature.to_csv(gPoIFeatureSavePath)
 
 def GenerateAreaGriddingFeature():
     """_summary_
+    not used!
+
     将地图栅格化之后，需要按照行和列作为编号来存储每个栅格的特征。
     也就是以3维的形式来存储PoI特征。
     现有的是使用grid来作为index存储的。但是transbigdata生成的grid无法确保唯一性，先用cantor函数来生成具有唯一性的grid。
@@ -790,10 +780,10 @@ def PreprocessTrajectory(userRange,
         # print('list len {} .'.format(len(ProcessSharedData.dat)))
 
         # MultiTrajectorys_pd = pd.concat(ProcessSharedData.dat)
-        print('ProcessSharedData.dat shape {}'.format(ProcessSharedData.dat.shape))
-        
+ 
         # 保存。
         ProcessSharedData.dat.to_csv(saveLcoation)
+        # print('\n Output all user trajectory shape is {}. in this time, hast attach PoI feature.\n'.format(ProcessSharedData.dat.shape))
         PrintEndInfo(functionName='PreprocessTrajectory', startTime=startTime)
         # return MultiTrajectorys_pd
 
@@ -807,12 +797,13 @@ def AttachFeaturetoSingleUserTrajectory(user):
     """
     PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
     PoIFeature['grid'] = PoIFeature.index
+    # print('\n 1 {} PoIFeature shape is {}. columns {}.\n'.format(user, PoIFeature.shape, PoIFeature.columns))
     
     userTrajectory = pd.read_csv(gOutputProecessedTrajectory.format(user), index_col=0)
 
     userTrajectory = userTrajectory.merge(PoIFeature, 
                                           on='grid', how='left').fillna(0)
-
+    # print('\n 1 {} UserTrajectory shape is {}. columns {}.\n'.format(user ,userTrajectory.shape, userTrajectory.columns))
     userTrajectory.to_csv(gSingleUserTrajectoryFeaturePath.format(user))
 
 
@@ -863,6 +854,7 @@ def AttachFeaturetoTrajectory(outputType='merged', chunksize = 250):
 
         for result in results:
             usersTrajectory = pd.concat([usersTrajectory, result])
+        # print('\n User trajectory feature shape is {} after attach PoI feature. \n'.format(usersTrajectory.shape))
         usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
         
         # meged_df = pd.DataFrame()
@@ -946,12 +938,14 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128,
     """
     
     stay = data.copy()
+    # print('3 stay shape {}'.format(stay.shape))
     # print(stay.head(2))
     # print(stay.columns)
 
     # 获得时间戳。
     stay['stimestamp'] = stay['stime'].astype('int64') // 1e9
     # stay.head()
+    # print('3.1 stay shape {}'.format(stay.shape))
 
     stayGroup = stay.groupby(pd.Grouper(key='stime', freq=interval))
 
@@ -1018,6 +1012,7 @@ def GenerateSingleUserStayMove(user):
     userTrajectory = pd.read_csv(gSingleUserTrajectoryFeaturePath.format(user), 
                                  index_col=0,
                                  parse_dates=['entireTime'])
+    # print('\n 2 {} UserTrajectory shape is {}. \n'.format(user ,userTrajectory.shape))
     
     # 去掉范围之外的轨迹。
     if gDeleteOutofBoundTrajectoryFlag == True:
@@ -1030,21 +1025,24 @@ def GenerateSingleUserStayMove(user):
                                 col=['userID', 'entireTime', 'longitude', 'latitude'], 
                                 activitytime=gActivityTime)
     
-
+    # print('\n 2 {} stay shape is {}. \n'.format(user ,stay.shape))
     # print(stay.columns)
-    print('-----0-----{}'.format(stay.columns))
+    # print('-----0-----{}'.format(stay.columns))
     # print(type(stay))
     
     # 生成grid。
     stay = stay.apply(GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
     move = move.apply(GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
-    print('-----3-----{}'.format(stay.columns))
+    # print('-----3-----{}'.format(stay.columns))
+    # print('\n 2.1 {} stay shape is {}. \n'.format(user ,stay.shape))
     # 生成时间特征。时间戳的特征也会在后面获取。
     stay = stay.apply(GenerateTimeFeature, axis=1)
     move = move.apply(GenerateTimeFeature, axis=1)
-    print('-----4-----{}'.format(stay.columns))
+    # print('-----4-----{}'.format(stay.columns))
+    # print('\n 2.2 {} stay shape is {}. \n'.format(user ,stay.shape))
 
     # 读取所有特征。
+    # tbd.traj_stay_move() drop other feature. so must merge PoI feature again.
     PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
     PoIFeature['grid'] = PoIFeature.index
 
@@ -1054,6 +1052,7 @@ def GenerateSingleUserStayMove(user):
     # so, feature of move need special process.
     # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
 
+    # print('2 Output single user stay shape is {}.'.format(stay.shape))
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
 
@@ -1061,7 +1060,7 @@ def GenerateSingleUserStayMove(user):
 
 
 def GenerateStayMoveByChunk(chunk):
-    startTime = PrintStartInfo('GenerateStayMoveByChunk()')
+    # startTime = PrintStartInfo('GenerateStayMoveByChunk()')
     if gDeleteOutofBoundTrajectoryFlag == True:
         chunk = tbd.clean_outofbounds(chunk, gBounds, col=['longitude', 'latitude'])
     
@@ -1073,8 +1072,6 @@ def GenerateStayMoveByChunk(chunk):
                                 activitytime=gActivityTime)
     # print('-----0.2-----{}'.format(stay.columns))
     # 生成grid。
-    # stay = stay.apply(GenerateGridByLongitudeLatitude, axis=1)
-    # move = move.apply(GenerateGridByLongitudeLatitude, axis=1)
     stay = stay.apply(GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
     move = move.apply(GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
     # 需要生成时间特征。
@@ -1082,6 +1079,7 @@ def GenerateStayMoveByChunk(chunk):
     move = move.apply(GenerateTimeFeature, col='etime', axis=1)
 
     # 读取所有特征。
+    # tbd.traj_stay_move() drop other feature. so must merge PoI feature again.
     PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
     PoIFeature['grid'] = PoIFeature.index
 
@@ -1091,7 +1089,7 @@ def GenerateStayMoveByChunk(chunk):
     # so, feature of move need special process.
     # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
 
-    PrintEndInfo('GenerateStayMoveByChunk()', startTime=startTime)
+    # PrintEndInfo('GenerateStayMoveByChunk()', startTime=startTime)
     return stay, move
 
 def GenerateStayMove(ProcessType = 'independent'):
@@ -1151,6 +1149,8 @@ def GenerateStayMove(ProcessType = 'independent'):
         # stays = pd.concat(stay)
         # moves = pd.concat(move)
 
+        # print('Output all users stays shape is {}.'.format(stays.shape))
+
         stays.to_csv(gStaySavePath)
         moves.to_csv(gMoveSavePath)
 
@@ -1158,22 +1158,23 @@ def GenerateStayMove(ProcessType = 'independent'):
 
 def GenerateSingleUserFeatureMatrix(user, shareData, lock):
     # 读取所有特征。
-    PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
-    PoIFeature['grid'] = PoIFeature.index
+    # has merge poi feature in generate stay.
+    # so delete above code.
+    # PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
+    # PoIFeature['grid'] = PoIFeature.index
 
     stay = pd.read_csv(gSingleUserStaySavePath.format(user), index_col=0)
     stay['stime'] = pd.to_datetime(stay['stime'])
 
     # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-    stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+    # stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
     # 生成矩阵并保存。
     with lock:
         _, shareData.dat = SeriesToMatrix(user=user, 
                                          data=stay, 
                                          interval='M', 
                                          maxrow=gMaxRow)
-
-gFeatureThirdDimension = 0
+        # print('--- shareData.dat {}'.format(shareData.dat))
 
 def GenerateFeatureMatrix(ProcessType = 'independent'):
     startTime = PrintStartInfo('GenerateFeatureMatrix()')
@@ -1192,7 +1193,7 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
         ProcessPool.close()
         ProcessPool.join()
         gFeatureThirdDimension = ShareData.dat
-        print('gFeatureThirdDimension {}'.format(gFeatureThirdDimension))
+        # print('--- gFeatureThirdDimension {}'.format(gFeatureThirdDimension))
 
         # global gFeatureThirdDimension
         # gFeatureThirdDimension = ShareData.dat.shape[2]
@@ -1205,9 +1206,9 @@ def CombineUsersMatrix():
 
     # stay = pd.read_csv(gSingleUserStaySavePath.format(gUserList[0]), index_col=0)
     # FeatureThirdDimension = stay.shape[1] - len(dropColunms)
-    # 18
-    FeatureThirdDimension = gFeatureThirdDimension
-    print('FeatureThirdDimension {}'.format(FeatureThirdDimension))
+    # 18 gFeatureThirdDimension
+    FeatureThirdDimension = 26
+    # print('FeatureThirdDimension {}, gFeatureThirdDimension {}'.format(FeatureThirdDimension, gFeatureThirdDimension))
     FeatureShape = (-1, gMaxRow, FeatureThirdDimension)
     # print('CombineUsersMatrix start. FeatureShape is {}'.format(FeatureShape))
     # 所有用户的轨迹特征存储。
@@ -1273,6 +1274,8 @@ def GenerateGeoFeature(stayInterval=1800):
     GenerateFeatureMatrix(ProcessType='independent')
     endTime6 = datetime.datetime.now()
     print("GenerateFeatureMatrix completed. {}".format(endTime6 - endTime5))
+
+    # print('--ooo- gFeatureThirdDimension {}'.format(gFeatureThirdDimension))
 
     CombineUsersMatrix()
     endTime7 = datetime.datetime.now()
