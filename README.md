@@ -445,3 +445,12 @@ All completed. 0:15:56.426793
 | 5   |                       |                                                                                                                                              |
 | 6   |                       |                                                                                                                                              |
 
+## next step
+
+1. 需要可以灵活的给用户的轨迹添加特征。
+   1. 需要添加速度特征。对于 stay 添加的速度特征是与前一个stay之间的速度。这是不是意味这需要添加的是和前一个stay的距离？
+   2. 新生成的特征可以通过函数直接附加到轨迹携带的特征上，从而不用每次都重新运行。
+2. 在没有生成stay和move之前，是否需要给轨迹添加PoI特征？需要思考，因为 transbigdata.traj_stay_move() 函数会将除它选择的列都删除。
+   1. ~~可以修改 transbigdata 的函数。~~
+   2. 也可以自己编写函数来生成stay和move。
+3. 其中 AttachFeaturetoTrajectory() 的 elif outputType == 'merged': 部分代码非常耗时，需要改进。
