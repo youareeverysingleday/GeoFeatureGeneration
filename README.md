@@ -25,13 +25,40 @@ This package can not run in jupyter, because package has used "mulitprocessing".
 |        |              |         |                                                                                                                           |
 |        |              |         |                                                                                                                           |
 
+## problom
+
+1. ~~出现了完全不在北京市的轨迹，用户ID为118、132、160。在将轨迹特征和PoI特征合并时会出现KeyError的报错。~~
+   1. 118的活动轨迹主要在内蒙古，距离最近的城市是黑龙江的齐齐哈尔。132的活动轨迹主要在宁波市和杭州市。160的活动轨迹主要在柬埔寨的暹粒市。
+   2. 在试验的时候pandas.dataframe merge空数据集是没有报错的。还不清楚在 GenerateGeographicFeature.py 中为什么报错。
+      1. 原因找到了：因为在对用户轨迹进行处理的函数中 PreprocessSingleTrajectoryMerged() 和 PreprocessSingleTrajectoryIndependent() 都做了 tbd.clean_outofbounds 处理。也就是将所有指定范围之外的轨迹删除了。这个时候用户ID为118、132、160三个用户的轨迹都处理指定范围之外，导致生成的轨迹dataframe虽然保留了列名，但是具体数据为空。而当使用 df_sampling = df_sampling.apply(GenerateGrid, axis=1) 生成grid的时候，由于具体数据为空，pandas的apply函数并不会生成一个新的'grid'列。所以导致 AttachFeaturetoSingleUserTrajectory() 和 MergeUsersTrajectoryandPoIFeature() 函数在合并 PoIFeature 和 用户轨迹数据时报 KeyError 的报错。
+   3. 解决方法：将tbd.clean_outofbounds 放到 df_sampling = df_sampling.apply(GenerateGrid, axis=1) 之后来执行。
+2. ~~直接的cantor配对函数只能应用在非负整数范围。很多坐标在计算格栅的时候为负值使用cantor配对函数出错。~~
+   1. 参考:<https://www.bilibili.com/read/cv8399988/>
+   2. 解决方法：将正整数和0折叠为自然数中的偶数，将负整数折叠为奇数。然后再使用cantor配对函数。
+      folding function：
+      $$
+            f(n) = \left\{\begin{aligned}
+            & 2n  & , \, & \text{if } n \geqslant 0\\
+            & 2|n| - 1 = 2  & , \, & \text{otherwise}
+            \end{aligned}\right.
+      $$
+
+      cantor pairing function: $z = \pi (x, y) = \frac{(x+y)(x+y+1)}{2} + y \, x,y\geqslant 0 \, ,x,y\in \mathbb{Z}. $
+
 ## next plan
 
 1. ~~完成geo特征的合并，在输出数据结构的时候使用合并之后的Geo特征。~~
 2. move的特征需要特殊处理。因为move包含起点和终点，有两个地理特征。
-3. 需要统一的列名。不能在不同的函数中使用不同的列名。
+3. 需要统一的列名。不能在不同的函数中使用不同的列名。特别是在生成PoI特征和用户轨迹时，经纬度列的命名方式有的是全称，有的是简写。需要统一。
 4. 输出图结构的数据。
-5. 使用cantor函数来生成唯一的grid编号。
+5. ~~使用cantor函数来生成唯一的grid编号。~~
+6. 需要可以灵活的给用户的轨迹添加特征。
+   1. 需要添加速度特征。对于 stay 添加的速度特征是与前一个stay之间的速度。这是不是意味这需要添加的是和前一个stay的距离？
+   2. 新生成的特征可以通过函数直接附加到轨迹携带的特征上，从而不用每次都重新运行。
+7. 在没有生成stay和move之前，是否需要给轨迹添加PoI特征？需要思考，因为 transbigdata.traj_stay_move() 函数会将除它选择的列都删除。
+   1. ~~可以修改 transbigdata 的函数。~~
+   2. 也可以自己编写函数来生成stay和move。
+8. 其中 AttachFeaturetoTrajectory() 的 elif outputType == 'merged': 部分代码非常耗时，需要改进。
 
 ## Function desrciption
 
@@ -59,6 +86,94 @@ This package can concat multi vectorized features to one matrix.
 |6|stay|(86, 30)|将stay和PoI特征合并之后生成的特征。|列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0']。|
 |7|stay|(86, 31)|由'stime'生成了'stimestamp'类之后的特征。|列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', 'stimestamp']。|
 |8|stay|(86, 26)|删除了['stime', 'etime', 'stayid', 'lon', 'lat']之后的特征。此为最终输出的特征。|列名称：[uid, 'LONCOL', 'LATCOL', 'duration', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', 'stimestamp']。|
+
+[输出的日志详见](#log-of-changes-in-data-shape)。
+
+### output data structure
+
+1. netural time series. completed.
+2. interaction matrxi. completed.
+3. similar netural language matrix. completed.
+4. graph structure. to be implemented.
+
+| num | format             | describe                                                         |
+| --- | ------------------ | ---------------------------------------------------------------- |
+| 1   | statistical matrix | mainly used for collaborative filtering or matrix factorization. |
+| 2   | language matrix    | mainly used for deep learning.                                   |
+| 3   | time series        | mainly used for LSTM or others.                                  |
+| 4   |                    |                                                                  |
+
+## File structure
+.
+├─README.md
+├─GenerateGeographicFeature.py # 由于transbigdata生成grid无法逆运算为行号和列号，所以使用其他的方式来生成grid的唯一值。对应的代码均需修改。
+├─GeoFeatureGeneration.py # 弃用。
+├─Parameters.json
+├─Data
+│  ├─BeiJing
+│  │   └─Data
+│  │       ├─AccommodationServices.csv
+│  │       ├─BusinessResidence.csv
+│  │       ├─CommunalFacilities.csv
+│  │       ├─Corporation.csv
+│  │       ├─FamousScenery.csv
+│  │       ├─FinancialandInsuranceServices.csv
+│  │       ├─GovernmentAgenciesandSocialOrganizations.csv
+│  │       ├─HealthCareServices.csv
+│  │       ├─LifeService.csv
+│  │       ├─Restaurant.csv
+│  │       ├─ScienceEducationandCulturalServices.csv
+│  │       ├─Shopping.csv
+│  │       ├─SportsLeisureServices.csv
+│  │       └─TransportationFacilitiesServices.csv
+│  ├─Geolife Trajectories 1.3
+│  │   └─Data
+│  │       ├─000
+│  |       │  └─Trajectory
+│  │       ├─001
+│  |       │  └─Trajectory
+│  │       ├─002
+│  |       │  └─Trajectory
+│  │       ├─003
+│  |       │  └─Trajectory
+│  |       ...
+│  │       ├─180
+│  |       │  └─Trajectory
+│  |       └─181
+│  |          └─Trajectory
+│  └─Output
+│      └─MultipleFeatures
+└─Test
+
+## Package dependence
+
+| num | package                | version |
+| --- | ---------------------- | ------- |
+| 1   | pandas                 |         |
+| 2   | numpy                  |         |
+| 3   | multiprocessing/python | >=3.9   |
+| 4   | geopandas              |         |
+| 5   | json                   |         |
+| 6   | datetime               |         |
+| 7   | transbigdata           |         |
+| 8   |                        |         |
+|     |                        |         |
+
+## Test dataset
+
+| num | data name             | source                                                                                                                                       |
+| --- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Microsoft GeoLife 1.3 | [Geolife GPS trajectory dataset – User Guide](https://www.microsoft.com/en-us/research/publication/geolife-gps-trajectory-dataset-user-guide/) |
+| 2   | BeiJing PoI feature   | Geographic  Data Sharing Infrastructure, College of Urban and  Environmental Science, Peking University (http://geodata.pku.edu.cn)          |
+| 3   |                       |                                                                                                                                              |
+| 4   |                       |                                                                                                                                              |
+| 5   |                       |                                                                                                                                              |
+| 6   |                       |                                                                                                                                              |
+
+
+## appendix 
+
+### Log of changes in data shape
 
 生成地理特征代码中的打印，用于观测生成过程中的数据的形状变化情况打印。
 
@@ -360,97 +475,3 @@ CombineUsersMatrix has completed.
 CombineUsersMatrix completed. 0:00:00.150205
 All completed. 0:15:56.426793
 ```
-
-### output data structure
-
-1. netural time series. completed.
-2. interaction matrxi. completed.
-3. similar netural language matrix. completed.
-4. graph structure. to be implemented.
-
-## File structure
-
-.
-├─README.md
-├─GenerateGeographicFeature.py # 由于transbigdata生成grid无法逆运算为行号和列号，所以使用其他的方式来生成grid的唯一值。对应的代码均需修改。
-├─GeoFeatureGeneration.py
-├─Parameters.json
-├─Data
-│  ├─BeiJing
-│  │   └─Data
-│  │       ├─AccommodationServices.csv
-│  │       ├─BusinessResidence.csv
-│  │       ├─CommunalFacilities.csv
-│  │       ├─Corporation.csv
-│  │       ├─FamousScenery.csv
-│  │       ├─FinancialandInsuranceServices.csv
-│  │       ├─GovernmentAgenciesandSocialOrganizations.csv
-│  │       ├─HealthCareServices.csv
-│  │       ├─LifeService.csv
-│  │       ├─Restaurant.csv
-│  │       ├─ScienceEducationandCulturalServices.csv
-│  │       ├─Shopping.csv
-│  │       ├─SportsLeisureServices.csv
-│  │       └─TransportationFacilitiesServices.csv
-│  ├─Geolife Trajectories 1.3
-│  │   └─Data
-│  │       ├─000
-│  |       │  └─Trajectory
-│  │       ├─001
-│  |       │  └─Trajectory
-│  │       ├─002
-│  |       │  └─Trajectory
-│  │       ├─003
-│  |       │  └─Trajectory
-│  |       ...
-│  │       ├─180
-│  |       │  └─Trajectory
-│  |       └─181
-│  |          └─Trajectory
-│  └─Output
-│      └─MultipleFeatures
-└─Test
-
-## Output format describe
-
-| num | format             | describe                                                         |
-| --- | ------------------ | ---------------------------------------------------------------- |
-| 1   | statistical matrix | mainly used for collaborative filtering or matrix factorization. |
-| 2   | language matrix    | mainly used for deep learning.                                   |
-| 3   | time series        | mainly used for LSTM or others.                                  |
-| 4   |                    |                                                                  |
-
-## Package dependence
-
-| num | package                | version |
-| --- | ---------------------- | ------- |
-| 1   | pandas                 |         |
-| 2   | numpy                  |         |
-| 3   | multiprocessing/python | >=3.9   |
-| 4   | geopandas              |         |
-| 5   | json                   |         |
-| 6   | datetime               |         |
-| 7   | transbigdata           |         |
-| 8   |                        |         |
-|     |                        |         |
-
-## Test dataset
-
-| num | data name             | source                                                                                                                                       |
-| --- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Microsoft GeoLife 1.3 | [Geolife GPS trajectory dataset – User Guide](https://www.microsoft.com/en-us/research/publication/geolife-gps-trajectory-dataset-user-guide/) |
-| 2   | BeiJing PoI feature   | Geographic  Data Sharing Infrastructure, College of Urban and  Environmental Science, Peking University (http://geodata.pku.edu.cn)          |
-| 3   |                       |                                                                                                                                              |
-| 4   |                       |                                                                                                                                              |
-| 5   |                       |                                                                                                                                              |
-| 6   |                       |                                                                                                                                              |
-
-## next step
-
-1. 需要可以灵活的给用户的轨迹添加特征。
-   1. 需要添加速度特征。对于 stay 添加的速度特征是与前一个stay之间的速度。这是不是意味这需要添加的是和前一个stay的距离？
-   2. 新生成的特征可以通过函数直接附加到轨迹携带的特征上，从而不用每次都重新运行。
-2. 在没有生成stay和move之前，是否需要给轨迹添加PoI特征？需要思考，因为 transbigdata.traj_stay_move() 函数会将除它选择的列都删除。
-   1. ~~可以修改 transbigdata 的函数。~~
-   2. 也可以自己编写函数来生成stay和move。
-3. 其中 AttachFeaturetoTrajectory() 的 elif outputType == 'merged': 部分代码非常耗时，需要改进。

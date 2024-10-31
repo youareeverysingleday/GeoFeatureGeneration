@@ -36,31 +36,38 @@ def PrintEndInfo(functionName, startTime, description=''):
                                      datetime.datetime.now() - startTime))
     if description != '':
         print(description)
-        
+
 def CantorPairingFunction(x, y):
     """_summary_
-    计算2个数的cantor配对函数的值。
+    先对x,y使用折叠函数，然后再计算2个数的cantor配对函数的值。
     Args:
-        x (int): 大于等于0的正整数。
-        y (int): 大于等于0的正整数。
+        x (int): 整数。
+        y (int): 整数。
 
     Returns:
         int: 返回cantor配对数。
     """
-    if x < 0 or y < 0:
-        print('CantorPairingFunction input x or y is out of range.')
-        return 0
+    if x >= 0:
+        x = 2 * x
+    else:
+        x = 2 * abs(x) - 1
+    
+    if y >= 0:
+        y = 2 * y
+    else:
+        y = 2 * abs(y) - 1
+
     return ((x + y) * (x + y + 1) // 2 + y)
 
 def CantorPairingInverseFunction(z):
     """_summary_
-    cantor配对函数的反函数。
+    先计算cantor配对函数反函数，然后x,y使用折叠反函数。
     Args:
         z (int): 两个数的cantor配对数值。
 
     Returns:
-        x (int): 大于等于0的正整数。
-        y (int): 大于等于0的正整数。
+        x (int): 整数。
+        y (int): 整数。
     """
     if z < 0 :
         print('CantorPairingInverseFunction input z is out of range.')
@@ -70,6 +77,17 @@ def CantorPairingInverseFunction(z):
     t = w * (w + 1) // 2
     y = z - t
     x = w - y
+    
+    if x % 2 == 0:
+        x = x / 2
+    else:
+        x = -((x + 1) / 2)
+    
+    if y % 2 == 0:
+        y = y / 2
+    else:
+        y = -((y + 1) / 2)
+
     return int(x), int(y)
 
 def GenerateGrid(df, lonColName='loncol', latColName='latcol'):
@@ -585,9 +603,7 @@ def PreprocessSingleTrajectoryIndependent(user):
 
     # 删除未使用的列
     df.drop(['zero', 'days'], axis=1, inplace=True) #drop函数默认删除行，列需要加axis = 1
-    if gDeleteOutofBoundTrajectoryFlag == True:
-        # Delete out of bounds .
-        df = tbd.clean_outofbounds(df, bounds = gBounds, col = ['lng', 'lat'])
+    
     # 准备对数据进行抽样，降低数据密度。
     df_sampling = pd.DataFrame()
     
@@ -631,7 +647,18 @@ def PreprocessSingleTrajectoryIndependent(user):
     df_sampling['loncol'], df_sampling['latcol'] = tbd.GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
     df_sampling = df_sampling.apply(GenerateGrid, axis=1)
     
+    # 这段代码必须放在 df_sampling = df_sampling.apply(GenerateGrid, axis=1) 之后来执行。
+    # 因为当删除超出范围的用户轨迹数据时，有118、132、160三个用户的轨迹完全不在指定的范围内，虽有这三个用户的轨迹数据为空。
+    # 而对于空的dataframe，df_sampling = df_sampling.apply(GenerateGrid, axis=1) 不会新生成'grid'列。
+    # 从而直接导致在将PoIFeature和轨迹数据合并时报KeyError的错误。
+    if gDeleteOutofBoundTrajectoryFlag == True:
+        # Delete out of bounds .
+        df_sampling = tbd.clean_outofbounds(df_sampling, bounds = gBounds, col = ['longitude', 'latitude'])
+    
     df_sampling['userID'] = user
+
+    if user == 118 or user == 132 or user == 160:
+        print('\n s Null Trajectory columns {}'.format(df_sampling.columns))
 
     if gSaveUserTrajectoryFlag == True:
         df_sampling.to_csv(gOutputProecessedTrajectory.format(user))
@@ -659,9 +686,7 @@ def PreprocessSingleTrajectoryMerged(user, sharedData, lock):
 
     # 删除未使用的列
     df.drop(['zero', 'days'], axis=1, inplace=True) #drop函数默认删除行，列需要加axis = 1
-    if gDeleteOutofBoundTrajectoryFlag == True:
-        # Delete out of bounds .
-        df = tbd.clean_outofbounds(df, bounds = gBounds, col = ['lng', 'lat'])
+    
     # 准备对数据进行抽样，降低数据密度。
     df_sampling = pd.DataFrame()
     
@@ -705,6 +730,17 @@ def PreprocessSingleTrajectoryMerged(user, sharedData, lock):
     df_sampling['loncol'], df_sampling['latcol'] = tbd.GPS_to_grid(df_sampling['longitude'], df_sampling['latitude'], gGeoParameters)
     df_sampling = df_sampling.apply(GenerateGrid, axis=1)
     
+    # 这段代码必须放在 df_sampling = df_sampling.apply(GenerateGrid, axis=1) 之后来执行。
+    # 因为当删除超出范围的用户轨迹数据时，有118、132、160三个用户的轨迹完全不在指定的范围内，虽有这三个用户的轨迹数据为空。
+    # 而对于空的dataframe，df_sampling = df_sampling.apply(GenerateGrid, axis=1) 不会新生成'grid'列。
+    # 从而直接导致在将PoIFeature和轨迹数据合并时报KeyError的错误。
+    if gDeleteOutofBoundTrajectoryFlag == True:
+        # Delete out of bounds .
+        df_sampling = tbd.clean_outofbounds(df_sampling, bounds = gBounds, col = ['longitude', 'latitude'])
+    
+    if user == 118 or user == 132 or user == 160:
+        print('\n m Null Trajectory columns {}'.format(df_sampling.columns))
+
     df_sampling['userID'] = user
 
     if gSaveUserTrajectoryFlag == True:
@@ -999,7 +1035,7 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128,
         # 保存。
         np_3d_to_csv(result, gSingleUserStayMatrixSavePath.format(user))
 
-    print('{} SeriesToMatrix have completed. FeatureThirdDimension is {}'.format(user, FeatureThirdDimension))
+    # print('{} SeriesToMatrix have completed. FeatureThirdDimension is {}'.format(user, FeatureThirdDimension))
     return result, FeatureThirdDimension
 
 def GenerateSingleUserStayMove(user):
@@ -1056,7 +1092,7 @@ def GenerateSingleUserStayMove(user):
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
 
-    print('{} feature has completed.'.format(user))
+    # print('{} feature has completed.'.format(user))
 
 
 def GenerateStayMoveByChunk(chunk):
