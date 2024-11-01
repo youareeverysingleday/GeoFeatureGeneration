@@ -1049,50 +1049,65 @@ def GenerateSingleUserStayMove(user):
                                  index_col=0,
                                  parse_dates=['entireTime'])
     # print('\n 2 {} UserTrajectory shape is {}. \n'.format(user ,userTrajectory.shape))
+    # print('\n ---2 {} UserTrajectory shape is {}. \n'.format(user ,userTrajectory.shape))
     
-    # 去掉范围之外的轨迹。
-    if gDeleteOutofBoundTrajectoryFlag == True:
-        userTrajectory = tbd.clean_outofbounds(userTrajectory, 
-                                         gBounds, 
-                                         col=['longitude', 'latitude'])
+    if userTrajectory.shape[0] == 0:
+        stay = pd.DataFrame(columns=['userID', 'stime', 'LONCOL', 'LATCOL', 'etime',
+                                      'lon', 'lat', 'duration', 'stayid', 'grid', 
+                                      'weekofyear', 'dayofweek', 'dayofyear','quarter', 'month', 
+                                      'hour', '0.0', '1.0', '2.0', '3.0', 
+                                      '4.0', '5.0', '6.0', '7.0', '8.0', 
+                                      '9.0', '10.0', '11.0', '12.0', '13.0'])
+        move = pd.DataFrame(columns=['userID', 'SLONCOL', 'SLATCOL', 'stime', 'slon', 
+                                     'slat', 'etime', 'elon', 'elat', 'ELONCOL', 
+                                     'ELATCOL', 'duration', 'moveid', 'grid', 'weekofyear', 
+                                     'dayofweek', 'dayofyear', 'quarter', 'month', 'hour'])
+        stay.to_csv(gSingleUserStaySavePath.format(user))
+        move.to_csv(gSingleUserMoveSavePath.format(user))
+    else:
+        # 去掉范围之外的轨迹。
+        if gDeleteOutofBoundTrajectoryFlag == True:
+            userTrajectory = tbd.clean_outofbounds(userTrajectory, 
+                                            gBounds, 
+                                            col=['longitude', 'latitude'])
 
-    stay, move = tbd.traj_stay_move(userTrajectory, 
-                                gGeoParameters,
-                                col=['userID', 'entireTime', 'longitude', 'latitude'], 
-                                activitytime=gActivityTime)
-    
-    # print('\n 2 {} stay shape is {}. \n'.format(user ,stay.shape))
-    # print(stay.columns)
-    # print('-----0-----{}'.format(stay.columns))
-    # print(type(stay))
-    
-    # 生成grid。
-    stay = stay.apply(GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
-    move = move.apply(GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
-    # print('-----3-----{}'.format(stay.columns))
-    # print('\n 2.1 {} stay shape is {}. \n'.format(user ,stay.shape))
-    # 生成时间特征。时间戳的特征也会在后面获取。
-    stay = stay.apply(GenerateTimeFeature, axis=1)
-    move = move.apply(GenerateTimeFeature, axis=1)
-    # print('-----4-----{}'.format(stay.columns))
-    # print('\n 2.2 {} stay shape is {}. \n'.format(user ,stay.shape))
+        stay, move = tbd.traj_stay_move(userTrajectory, 
+                                    gGeoParameters,
+                                    col=['userID', 'entireTime', 'longitude', 'latitude'], 
+                                    activitytime=gActivityTime)
+        
+        # print('\n 2 {} stay shape is {}. \n'.format(user ,stay.shape))
+        # print(stay.columns)
+        # print('-----0-----{}'.format(stay.columns))
+        # print(type(stay))
+        
+        # 生成grid。
+        stay = stay.apply(GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
+        move = move.apply(GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
+        # print('-----3-----{}'.format(stay.columns))
+        # print('\n 2.1 {} stay shape is {}. \n'.format(user ,stay.shape))
+        # 生成时间特征。时间戳的特征也会在后面获取。
+        stay = stay.apply(GenerateTimeFeature, axis=1)
+        move = move.apply(GenerateTimeFeature, axis=1)
+        # print('-----4-----{}'.format(stay.columns))
+        # print('\n 2.2 {} stay shape is {}. \n'.format(user ,stay.shape))
 
-    # 读取所有特征。
-    # tbd.traj_stay_move() drop other feature. so must merge PoI feature again.
-    PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
-    PoIFeature['grid'] = PoIFeature.index
+        # 读取所有特征。
+        # tbd.traj_stay_move() drop other feature. so must merge PoI feature again.
+        PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
+        PoIFeature['grid'] = PoIFeature.index
 
-    # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-    stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
-    # move contain feature of start place and feature of end place.
-    # so, feature of move need special process.
-    # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
+        # 将通过PoI获得的特征以及其他特征和停留点特征合并。
+        stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+        # move contain feature of start place and feature of end place.
+        # so, feature of move need special process.
+        # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
 
-    # print('2 Output single user stay shape is {}.'.format(stay.shape))
-    stay.to_csv(gSingleUserStaySavePath.format(user))
-    move.to_csv(gSingleUserMoveSavePath.format(user))
+        # print('2 Output single user stay shape is {}.'.format(stay.shape))
+        stay.to_csv(gSingleUserStaySavePath.format(user))
+        move.to_csv(gSingleUserMoveSavePath.format(user))
 
-    # print('{} feature has completed.'.format(user))
+        # print('{} feature has completed.'.format(user))
 
 
 def GenerateStayMoveByChunk(chunk):

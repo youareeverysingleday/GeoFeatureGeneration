@@ -11,7 +11,7 @@ This package can not run in jupyter, because package has used "mulitprocessing".
 | number | city           | Regional scope               | description                       |
 | ------ | -------------- | ---------------------------- | --------------------------------- |
 | 1      | 北京经纬度范围 | 115.7, 39.4, 117.4, 41.6     | 北京目前之后北京大学提供的PoI数据 |
-| 2      | 武汉经纬度范围 | 113.68, 29.97, 115.08, 31.37 | ......                          |
+| 2      | 武汉经纬度范围 | 113.68, 29.97, 115.08, 31.37 | ......                            |
 
 ## publish information
 
@@ -33,17 +33,24 @@ This package can not run in jupyter, because package has used "mulitprocessing".
       1. 原因找到了：因为在对用户轨迹进行处理的函数中 PreprocessSingleTrajectoryMerged() 和 PreprocessSingleTrajectoryIndependent() 都做了 tbd.clean_outofbounds 处理。也就是将所有指定范围之外的轨迹删除了。这个时候用户ID为118、132、160三个用户的轨迹都处理指定范围之外，导致生成的轨迹dataframe虽然保留了列名，但是具体数据为空。而当使用 df_sampling = df_sampling.apply(GenerateGrid, axis=1) 生成grid的时候，由于具体数据为空，pandas的apply函数并不会生成一个新的'grid'列。所以导致 AttachFeaturetoSingleUserTrajectory() 和 MergeUsersTrajectoryandPoIFeature() 函数在合并 PoIFeature 和 用户轨迹数据时报 KeyError 的报错。
    3. 解决方法：将tbd.clean_outofbounds 放到 df_sampling = df_sampling.apply(GenerateGrid, axis=1) 之后来执行。
 2. ~~直接的cantor配对函数只能应用在非负整数范围。很多坐标在计算格栅的时候为负值使用cantor配对函数出错。~~
-   1. 参考:<https://www.bilibili.com/read/cv8399988/>
+   1. 参考:[https://www.bilibili.com/read/cv8399988/](https://www.bilibili.com/read/cv8399988/)
    2. 解决方法：将正整数和0折叠为自然数中的偶数，将负整数折叠为奇数。然后再使用cantor配对函数。
       folding function：
+
       $$
-            f(n) = \left\{\begin{aligned}
+      f(n) = \left\{\begin{aligned}
             & 2n  & , \, & \text{if } n \geqslant 0\\
             & 2|n| - 1 = 2  & , \, & \text{otherwise}
             \end{aligned}\right.
       $$
 
       cantor pairing function: $z = \pi (x, y) = \frac{(x+y)(x+y+1)}{2} + y \, x,y\geqslant 0 \, ,x,y\in \mathbb{Z}. $
+3. ~~tbd.traj_stay_move() 函数在生成 move['duration'] = ( move['etime'] - move['stime']).dt.total_seconds() 是没有像 生成stay['duration'] = (pd.to_datetime(stay['etime']) - pd.to_datetime(stay['stime'])).dt.total_seconds() 一样将 move['etime'] 和 move['stime'] 使用 pd.to_datetime() 方法转换。从而导致在 GenerateTimeFeature() 在生成时间的时候报错。~~
+   1. 解决方法：修改transbigdata的源码。将transbigdata中的traj.py文件中的traj_stay_move()第729行修改为 move['duration'] = (pd.to_datetime((move['etime']) - pd.to_datetime((move['stime'])).dt.total_seconds() 。
+4. ~~在GenerateSingleUserStayMove() 和 GenerateStayMoveByChunk() 方法使用过程中遇到了和1中一样的问题。也就是对于特定用户的 userTrajectory 是空的。导致没有生成grid列。~~
+   1. 解决方法：判断读取的 userTrajectory 的形状是否没有内容。直接生成空的DataFrame来保存。GenerateStayMoveByChunk()可能由于多个用户共同的轨迹文件的体积大，所以没有出现上述症状。
+5. ~~之前设置的北京的坐标范围[115.7, 39.4, 117.4, 41.6]有问题。上边界距离北京太远。~~
+   1. 解决方法：现在设置为：gBounds = [115.4, 39.4, 117.55, 41.1]。经度越往东数值越大，是竖线。纬度越往北数值越大，是横线。参考[全国各省市经纬度范围](https://blog.csdn.net/esa72ya/article/details/114642127)，应该设置为：115.416827~117.508251，39.442078~41.058964。
 
 ## next plan
 
@@ -68,24 +75,24 @@ This package can concat multi vectorized features to one matrix.
 
 ![project flow chart](./Pictures/FlowChart.png "project flow chart")
 
-
-## process of shape change of output data 
+## process of shape change of output data
 
 在仅使用社会开源PoI的情况下，**最终保存为3维数据时的第三个维度形状为26**。也就是特征矩阵的列数为26。
 
 需要注意的是grid是通过 康托 函数通过列号和行号生成的。
 
 注意，只需要注意shape中的第二个维度的值即可，第一个维度值是和业务具体相关的。
-|number|name|shape|description|columns name|
-|---|---|---|---|---|
-|1|PoIFeture|(9062, 15)|只包含社会特征的PoI特征。|列名称：['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', 'grid']。|
-|2|UserTrajectory|(28307, 22)|将轨迹中的基本信息和PoI特征合并之后的特征。|列名称：['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol', 'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0']。|
-|3|stay|(55, 9)|由 tbd.traj_stay_move() 函数通过 UserTrajectory 生成的停留点特征。注意move 的特征和stay的形状不一样。|列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid']。|
-|4|stay|(55, 10)|添加了gird之后的stay。|列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid']。|
-|5|stay|(86, 16)|将时间'stime'列有 GenerateTimeFeature() 函数生成了6个时间特征。|列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour']。|
-|6|stay|(86, 30)|将stay和PoI特征合并之后生成的特征。|列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0']。|
-|7|stay|(86, 31)|由'stime'生成了'stimestamp'类之后的特征。|列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', 'stimestamp']。|
-|8|stay|(86, 26)|删除了['stime', 'etime', 'stayid', 'lon', 'lat']之后的特征。此为最终输出的特征。|列名称：[uid, 'LONCOL', 'LATCOL', 'duration', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', 'stimestamp']。|
+
+| number | name           | shape       | description                                                                                           | columns name                                                                                                                                                                                                                                                                              |
+| ------ | -------------- | ----------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1      | PoIFeture      | (9062, 15)  | 只包含社会特征的PoI特征。                                                                             | 列名称：['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', 'grid']。                                                                                                                                                                  |
+| 2      | UserTrajectory | (28307, 22) | 将轨迹中的基本信息和PoI特征合并之后的特征。                                                           | 列名称：['latitude', 'longitude', 'alt', 'entireTime', 'loncol', 'latcol', 'grid', 'userID', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0']。                                                                                      |
+| 3      | stay           | (55, 9)     | 由 tbd.traj_stay_move() 函数通过 UserTrajectory 生成的停留点特征。注意move 的特征和stay的形状不一样。 | 列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid']。                                                                                                                                                                                                 |
+| 4      | stay           | (55, 10)    | 添加了gird之后的stay。                                                                                | 列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid']。                                                                                                                                                                                         |
+| 5      | stay           | (86, 16)    | 将时间'stime'列有 GenerateTimeFeature() 函数生成了6个时间特征。                                       | 列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour']。                                                                                                                     |
+| 6      | stay           | (86, 30)    | 将stay和PoI特征合并之后生成的特征。                                                                   | 列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0']。               |
+| 7      | stay           | (86, 31)    | 由'stime'生成了'stimestamp'类之后的特征。                                                             | 列名称：[uid, 'stime', 'LONCOL', 'LATCOL', 'etime', 'lon', 'lat', 'duration', 'stayid', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', 'stimestamp']。 |
+| 8      | stay           | (86, 26)    | 删除了['stime', 'etime', 'stayid', 'lon', 'lat']之后的特征。此为最终输出的特征。                      | 列名称：[uid, 'LONCOL', 'LATCOL', 'duration', 'grid', 'weekofyear', 'dayofweek', 'dayofyear', 'quarter', 'month', 'hour', '0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', 'stimestamp']。                                           |
 
 [输出的日志详见](#log-of-changes-in-data-shape)。
 
@@ -104,6 +111,7 @@ This package can concat multi vectorized features to one matrix.
 | 4   |                    |                                                                  |
 
 ## File structure
+
 .
 ├─README.md
 ├─GenerateGeographicFeature.py # 由于transbigdata生成grid无法逆运算为行号和列号，所以使用其他的方式来生成grid的唯一值。对应的代码均需修改。
@@ -170,16 +178,14 @@ This package can concat multi vectorized features to one matrix.
 | 5   |                       |                                                                                                                                              |
 | 6   |                       |                                                                                                                                              |
 
-
-## appendix 
+## appendix
 
 ### Log of changes in data shape
 
 生成地理特征代码中的打印，用于观测生成过程中的数据的形状变化情况打印。
 
 ```log
-(base) engineer@engineer-GPU00:/workspace/codespace/GeoFeatureGeneration$ cd /workspace/codespace/GeoFeatureGeneration
-/bin/python3 /workspace/codespace/GeoFeatureGenera(base) engineer@engineer-GPU00:/workspace/codespace/GeoFeatureGeneration$ /bin/python3 /workspace/codespace/GeoFeatureGeneration/GenerateGeographicFeature.py
+GPU00:/workspace/codespace/GeoFeatureGeneration$ /bin/python3 /workspace/codespace/GeoFeatureGeneration/GenerateGeographicFeature.py
 Start function: GetSocialPoIFeature() ,pid: 68720 ,start at: 2024-10-28 17:51:25 .
 ./Data/Output/MultipleFeatures/SocialFeature.csv is exist, will overwrite.
 End function: GetSocialPoIFeature() ,pid: 68720 ,completed time: 2024-10-28 17:52:55.877729 ,
