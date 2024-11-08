@@ -66,6 +66,8 @@ This package can not run in jupyter, because package has used "mulitprocessing".
    1. ~~可以修改 transbigdata 的函数。~~
    2. 也可以自己编写函数来生成stay和move。
 8. 其中 AttachFeaturetoTrajectory() 的 elif outputType == 'merged': 部分代码非常耗时，需要改进。
+9. 每个地域的特征是随着用户和时间变化而变化的。比如用户在白天访问一个地域的医院，但是在晚上访问同一个地域的超市。由于时间的变化，同一个地域的特征表现是不一样的。同样的不同的用户也访问同一个不同特征。
+   1. 需要通过一个模型来学习不同时间地域的不同特征表现。不同的人不同时间访问同一地域会生成该地域的不同特征。time2vec模型。如果没有明确用户的特制的情况下，用用户的轨迹来描述用户的特征。有明确用户特征的，直接用用户特征来区分用户。参考GETNext论文中的表述。
 
 ## Function desrciption
 
