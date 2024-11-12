@@ -1038,6 +1038,24 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128,
     # print('{} SeriesToMatrix have completed. FeatureThirdDimension is {}'.format(user, FeatureThirdDimension))
     return result, FeatureThirdDimension
 
+def ColumnContainJudgement(df, columnName, difference=''):
+    """_summary_
+    判断Dataframe列中是否存在 columnName 的列名。
+    Args:
+        df (pandas.dataframe): 被判断的dataframe。
+        columnName (string): 被判断是否存在的列名。
+        difference (string): 区别不同打印位置的标识。
+    Returns:
+        boolean: 是否存在输入的列名。
+    """
+    result = df.columns[df.columns.str.contains(columnName)]
+    if len(result) != 0:
+        # print('{} True {}'.format(difference, result))
+        return True
+    else:
+        print('{} False {}, shape is {}.'.format(difference, df.columns, df.shape))
+        return False
+
 def GenerateSingleUserStayMove(user):
     """_summary_
     生成单个用户的特征。在处理整个用户轨迹特征文件的时候非常耗时。所以推荐使用分别处理每个单个用户的轨迹特征。
@@ -1051,6 +1069,7 @@ def GenerateSingleUserStayMove(user):
     # print('\n 2 {} UserTrajectory shape is {}. \n'.format(user ,userTrajectory.shape))
     # print('\n ---2 {} UserTrajectory shape is {}. \n'.format(user ,userTrajectory.shape))
     
+    # 首先判断轨迹是否为空。也就是用户的轨迹都在设置的区域之外。118, 132, 160三个用户在设置区域之外。
     if userTrajectory.shape[0] == 0:
         stay = pd.DataFrame(columns=['userID', 'stime', 'LONCOL', 'LATCOL', 'etime',
                                       'lon', 'lat', 'duration', 'stayid', 'grid', 
@@ -1062,8 +1081,6 @@ def GenerateSingleUserStayMove(user):
                                      'slat', 'etime', 'elon', 'elat', 'ELONCOL', 
                                      'ELATCOL', 'duration', 'moveid', 'grid', 'weekofyear', 
                                      'dayofweek', 'dayofyear', 'quarter', 'month', 'hour'])
-        stay.to_csv(gSingleUserStaySavePath.format(user))
-        move.to_csv(gSingleUserMoveSavePath.format(user))
     else:
         # 去掉范围之外的轨迹。
         if gDeleteOutofBoundTrajectoryFlag == True:
@@ -1076,38 +1093,51 @@ def GenerateSingleUserStayMove(user):
                                     col=['userID', 'entireTime', 'longitude', 'latitude'], 
                                     activitytime=gActivityTime)
         
-        # print('\n 2 {} stay shape is {}. \n'.format(user ,stay.shape))
-        # print(stay.columns)
-        # print('-----0-----{}'.format(stay.columns))
-        # print(type(stay))
-        
-        # 生成grid。
-        stay = stay.apply(GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
-        move = move.apply(GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
-        # print('-----3-----{}'.format(stay.columns))
-        # print('\n 2.1 {} stay shape is {}. \n'.format(user ,stay.shape))
-        # 生成时间特征。时间戳的特征也会在后面获取。
-        stay = stay.apply(GenerateTimeFeature, axis=1)
-        move = move.apply(GenerateTimeFeature, axis=1)
-        # print('-----4-----{}'.format(stay.columns))
-        # print('\n 2.2 {} stay shape is {}. \n'.format(user ,stay.shape))
+        # 设置的判断是否为stay点的时间超参数是30分钟，判断没有生成停留点数据。
+        # 049, 120, 123, 137, 178 四个用户没有生成停留点。
+        if stay.shape[0] == 0:
+            stay = pd.DataFrame(columns=['userID', 'stime', 'LONCOL', 'LATCOL', 'etime',
+                                      'lon', 'lat', 'duration', 'stayid', 'grid', 
+                                      'weekofyear', 'dayofweek', 'dayofyear','quarter', 'month', 
+                                      'hour', '0.0', '1.0', '2.0', '3.0', 
+                                      '4.0', '5.0', '6.0', '7.0', '8.0', 
+                                      '9.0', '10.0', '11.0', '12.0', '13.0'])
+            ColumnContainJudgement(stay, 'grid', '{} stay'.format(user))
+        else:
+            # 生成grid。
+            stay = stay.apply(GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
+            # 生成时间特征。时间戳的特征也会在后面获取。
+            stay = stay.apply(GenerateTimeFeature, axis=1)
 
-        # 读取所有特征。
-        # tbd.traj_stay_move() drop other feature. so must merge PoI feature again.
-        PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
-        PoIFeature['grid'] = PoIFeature.index
+            # 读取所有特征。
+            PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
+            PoIFeature['grid'] = PoIFeature.index
+            # 将通过PoI获得的特征以及其他特征和停留点特征合并。
+            stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
 
-        # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-        stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
-        # move contain feature of start place and feature of end place.
-        # so, feature of move need special process.
-        # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
+        if move.shape[0] == 0:
+            move = pd.DataFrame(columns=['userID', 'SLONCOL', 'SLATCOL', 'stime', 'slon', 
+                                        'slat', 'etime', 'elon', 'elat', 'ELONCOL', 
+                                        'ELATCOL', 'duration', 'moveid', 'grid', 'weekofyear', 
+                                        'dayofweek', 'dayofyear', 'quarter', 'month', 'hour'])
+            ColumnContainJudgement(move, 'grid', '{} move'.format(user))
+        else:
+            # 生成grid。
+            move = move.apply(GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
+            # 生成时间特征。时间戳的特征也会在后面获取。
+            move = move.apply(GenerateTimeFeature, axis=1)
+            # move contain feature of start place and feature of end place.
+            # so, feature of move need special process.
+            # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
+            # 读取所有特征。
+            # PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
+            # PoIFeature['grid'] = PoIFeature.index
 
-        # print('2 Output single user stay shape is {}.'.format(stay.shape))
-        stay.to_csv(gSingleUserStaySavePath.format(user))
-        move.to_csv(gSingleUserMoveSavePath.format(user))
+    # save data.
+    stay.to_csv(gSingleUserStaySavePath.format(user))
+    move.to_csv(gSingleUserMoveSavePath.format(user))
 
-        # print('{} feature has completed.'.format(user))
+    # print('{} feature has completed.'.format(user))
 
 
 def GenerateStayMoveByChunk(chunk):
