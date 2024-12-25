@@ -21,7 +21,7 @@ This package can not run in jupyter, because package has used "mulitprocessing".
 | 2      | 20240409     | 1.0.1   | output series of stay contain PoI feature.                                                                                |
 | 3      | 20240625     | 1.0.2   | generate negative PoI feature of area.                                                                                    |
 | 4      | 20241024     | 1.0.3   | because transbigdata package generate grid can't recover loncol and latcol, so use Cantor function to solve this problem. |
-|        |              |         |                                                                                                                           |
+| 5  | 20241225   | 2.0.0  | separate the code of feature generate and feature attachment. when adding new feature, there is no need to rerun all code.                                                              |
 |        |              |         |                                                                                                                           |
 |        |              |         |                                                                                                                           |
 
@@ -122,45 +122,50 @@ This package can concat multi vectorized features to one matrix.
 ## File structure
 
 .
-├─README.md
-├─GenerateGeographicFeature.py # 由于transbigdata生成grid无法逆运算为行号和列号，所以使用其他的方式来生成grid的唯一值。对应的代码均需修改。
-├─GeoFeatureGeneration.py # 弃用。
-├─Parameters.json
-├─Data
-│  ├─BeiJing
-│  │   └─Data
-│  │       ├─AccommodationServices.csv
-│  │       ├─BusinessResidence.csv
-│  │       ├─CommunalFacilities.csv
-│  │       ├─Corporation.csv
-│  │       ├─FamousScenery.csv
-│  │       ├─FinancialandInsuranceServices.csv
-│  │       ├─GovernmentAgenciesandSocialOrganizations.csv
-│  │       ├─HealthCareServices.csv
-│  │       ├─LifeService.csv
-│  │       ├─Restaurant.csv
-│  │       ├─ScienceEducationandCulturalServices.csv
-│  │       ├─Shopping.csv
-│  │       ├─SportsLeisureServices.csv
-│  │       └─TransportationFacilitiesServices.csv
-│  ├─Geolife Trajectories 1.3
-│  │   └─Data
-│  │       ├─000
-│  |       │  └─Trajectory
-│  │       ├─001
-│  |       │  └─Trajectory
-│  │       ├─002
-│  |       │  └─Trajectory
-│  │       ├─003
-│  |       │  └─Trajectory
+├─ README.md
+├─ GenerateGeographicFeature.py # 特征生成。
+├─ AttachFeature.py # 特征附着到轨迹上。
+├─ Parameters.json
+├─ OldVersion
+│  ├─ GenerateGeographicFeature_v1.0.3.py # 弃用。
+│  └─ GeoFeatureGeneration_v1.py # 弃用。
+├─ Data
+│  ├─ Foursquare # 20241214发布的 Foursquare PoI 特征数据。
+│  |   └─ ...
+│  ├─ BeiJing
+│  │   └─ Data
+│  │       ├─ AccommodationServices.csv
+│  │       ├─ BusinessResidence.csv
+│  │       ├─ CommunalFacilities.csv
+│  │       ├─ Corporation.csv
+│  │       ├─ FamousScenery.csv
+│  │       ├─ FinancialandInsuranceServices.csv
+│  │       ├─ GovernmentAgenciesandSocialOrganizations.csv
+│  │       ├─ HealthCareServices.csv
+│  │       ├─ LifeService.csv
+│  │       ├─ Restaurant.csv
+│  │       ├─ ScienceEducationandCulturalServices.csv
+│  │       ├─ Shopping.csv
+│  │       ├─ SportsLeisureServices.csv
+│  │       └─ TransportationFacilitiesServices.csv
+│  ├─ Geolife Trajectories 1.3
+│  │   └─ Data
+│  │       ├─ 000
+│  |       │  └─ Trajectory
+│  │       ├─ 001
+│  |       │  └─ Trajectory
+│  │       ├─ 002
+│  |       │  └─ Trajectory
+│  │       ├─ 003
+│  |       │  └─ Trajectory
 │  |       ...
-│  │       ├─180
-│  |       │  └─Trajectory
-│  |       └─181
-│  |          └─Trajectory
-│  └─Output
-│      └─MultipleFeatures
-└─Test
+│  │       ├─ 180
+│  |       │  └─ Trajectory
+│  |       └─ 181
+│  |          └─ Trajectory
+│  └─ Output
+│      └─ MultipleFeatures
+└─ Test
 
 ## Package dependence
 
