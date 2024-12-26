@@ -173,7 +173,7 @@ This package can concat multi vectorized features to one matrix.
 | --- | ---------------------- | ------- |
 | 1   | pandas                 |         |
 | 2   | numpy                  |         |
-| 3   | multiprocessing/python | >=3.9   |
+| 3   | multiprocessing/python | python >=3.9   |
 | 4   | geopandas              |         |
 | 5   | json                   |         |
 | 6   | datetime               |         |

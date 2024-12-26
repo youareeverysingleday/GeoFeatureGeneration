@@ -7,6 +7,11 @@ import multiprocessing
 import json
 import datetime
 
+# 通过经纬度获取地址。
+from geopy.geocoders import Nominatim
+# 将地址向量化。
+from sentence_transformers import SentenceTransformer, util
+
 
 ## 小工具
 
@@ -269,7 +274,7 @@ def GetParameters(parametersPath='./Parameters.json'):
     gFeatureThirdDimension = 0
     
 
-def GeneratePekingUniversityPoIFeature(FilePath, fileParameters, GeoParameters, gSharedData, lock):
+def GenerateSinglePekingUniversityPoIFeature(FilePath, fileParameters, GeoParameters, gSharedData, lock):
     """_summary_
     对北京大学开源的PoI数据类别进行处理，生成PoI特征。使用multiprocessing进行处理。
     Args:
@@ -320,9 +325,45 @@ def GeneratePekingUniversityPoIFeature(FilePath, fileParameters, GeoParameters, 
         # 按列名拼接。也就是列名相同的会自动对应，缺少的列填0值。
         # 此时的index是grid，后面还需要聚合操作的，所以不能忽略。
         gSharedData.dat = pd.concat([gSharedData.dat, df]).fillna(0.0)
-        
 
-def GetSocialPoIFeature():
+def GenerateAddressFeature(df, geolocator, model, GeoParameters):
+    """_summary_
+    生成地址携带的特征。因为单纯的poi特征没有表明方位信息，也就是说在东面的一个商场和西面的一个商场在poi特征上是一样的。但是他们距离用户的真实地址是不一样的。
+    同时地址表明了地理上人文属性，比如国家、省份等。
+    另外顺便也要将经纬度信息放入特征中，因为经纬度从另一个方面表明了相对的距离信息。同时经纬度有它的缺陷，明显的经纬度0-180之间有个突然的转换。所以只能作为特征一种。
+
+    步骤：
+    1. 通过 grid 和 transbigdata 换算出格栅中心的经纬度。
+    2. 通过 geopy 获得经纬度的地址。
+    3. 通过 sentence_transformers 将地址向量化。
+    4. 将经纬度和地址的向量化信息添加到poi特征中。
+
+    Args:
+        df (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+
+    loncol, latcol = CantorPairingInverseFunction(df['grid'])
+    longitude, latitude = tbd.grid_to_centre([loncol, latcol], GeoParameters)
+    df['longitude'] = longitude
+    df['latitude'] = latitude
+
+    # 获取地址。
+    location = geolocator.reverse(f"{latitude}, {longitude}")
+    address = location.address
+
+    # 获取地址的embedding。
+    embedding = model.encode(address)
+    embedding = pd.Series(embedding)
+    
+    # series 是按照行进行合并。也就是 axis=0 。
+    df = pd.concat([df, embedding], axis=0)
+
+    return df
+
+def GetPekingUniversityPoIFeature():
     """_summary_
     生成PoI特征。
     Returns:
@@ -356,7 +397,7 @@ def GetSocialPoIFeature():
     for fn in AllFilesName:
         FilePath = (gPoIFolderPath + "{}").format(fn)
         # 多进程处理。
-        gMultiProcessingPool.apply_async(GeneratePekingUniversityPoIFeature, 
+        gMultiProcessingPool.apply_async(GenerateSinglePekingUniversityPoIFeature, 
                                          args=(FilePath, fileParameters, gGeoParameters, gSharedData, gMultiProcessinglock))
     
     gMultiProcessingPool.close()
@@ -374,6 +415,20 @@ def GetSocialPoIFeature():
     
     # 将这部分PoI特征复制一份并返回。
     partofPoIFeature = gSharedData.dat.copy()
+
+    print(partofPoIFeature.columns)
+
+    # --------------------这里添加从poi数据中获取的特征。-----------------------
+    # 添加地址嵌入向量和经纬度。
+    geolocator = Nominatim(user_agent="http")
+    model = SentenceTransformer('sentence-transformers/distiluse-base-multilingual-cased-v2')
+
+    partofPoIFeature = partofPoIFeature.apply(GenerateAddressFeature, 
+                                              geolocator=geolocator, model=model, GeoParameters=gGeoParameters, 
+                                              axis=1)
+    # -------------------------------------------
+
+    # 保存。
     gSharedData.dat.to_csv(gPoISocialFeatureSavePath)
     
     PrintEndInfo(functionName='GetSocialPoIFeature()', startTime=startTime)
@@ -499,7 +554,7 @@ def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/'
         OthersFeatureFlag (bool, optional): 是否包含除了社会PoI之外的的特征数据。默认是没有. Defaults to False.
     """
     # 先获取北京大学提供的PoI特征。
-    PartofPoIFeature = GetSocialPoIFeature()
+    PartofPoIFeature = GetPekingUniversityPoIFeature()
     
     # 创建一个空的合并所有PoI特征的DataFrame。
     PoIFeature = pd.DataFrame()
@@ -523,3 +578,11 @@ def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/'
     
     # print('\n Output PoI feature shape is {}. columns {}.\n'.format(PoIFeature.shape, PoIFeature.columns))
     PoIFeature.to_csv(gPoIFeatureSavePath)
+
+if __name__ == '__main__':
+    startTime = datetime.datetime.now()
+    GetParameters('./Parameters.json')
+    # print(gfg.gGeoParameters)
+    CombineMultiPoIFeatures(OthersFeatureFlag=False)
+    endTime1 = datetime.datetime.now()
+    print("GetPoIFeature completed. {}".format(endTime1 - startTime))
