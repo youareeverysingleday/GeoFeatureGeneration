@@ -8,6 +8,7 @@ import json
 import datetime
 
 import CommonCode as cc
+import time
 
 # 通过经纬度获取地址。
 from geopy.geocoders import Nominatim
@@ -223,18 +224,32 @@ def GenerateSinglePekingUniversityPoIFeature(FilePath, fileParameters, GeoParame
         # 此时的index是grid，后面还需要聚合操作的，所以不能忽略。
         gSharedData.dat = pd.concat([gSharedData.dat, df]).fillna(0.0)
 
-def GenerateAddressFeature(df, geolocator, model, GeoParameters):
+def GetAddress(df, geolocator):
+    # 由于获取经纬度对应的地址需要通过互联网访问，可能API受到了限制，所以需要单独进行处理。
+    try:
+        # 获取地址。
+        location = geolocator.reverse(f"{df['latitude']}, {df['longitude']}")
+        df['address'] = location.address
+    except:
+        df['address'] = 'networkerror'
+        print('grid {} network error.'.format(df.name))
+        time.sleep(1)
+    return df
+
+def GenerateAddressEmbedding(df, model, vectorLength=512):
+
+    if df['address'] == 'networkerror':
+        embedding = pd.Series(data=[0]*vectorLength)
+    else:
+        embedding = model.encode(df['address'])
+        embedding = pd.Series(embedding)
+        df = pd.concat([df, embedding], axis=0)
+
+        return df
+
+def GetLongitudeLatitude(df, GeoParameters):
     """_summary_
-    生成地址携带的特征。因为单纯的poi特征没有表明方位信息，也就是说在东面的一个商场和西面的一个商场在poi特征上是一样的。但是他们距离用户的真实地址是不一样的。
-    同时地址表明了地理上人文属性，比如国家、省份等。
-    另外顺便也要将经纬度信息放入特征中，因为经纬度从另一个方面表明了相对的距离信息。同时经纬度有它的缺陷，明显的经纬度0-180之间有个突然的转换。所以只能作为特征一种。
-
-    步骤：
-    1. 通过 grid 和 transbigdata 换算出格栅中心的经纬度。
-    2. 通过 geopy 获得经纬度的地址。
-    3. 通过 sentence_transformers 将地址向量化。
-    4. 将经纬度和地址的向量化信息添加到poi特征中。
-
+    生成经纬度。
     Args:
         df (_type_): _description_
 
@@ -246,17 +261,6 @@ def GenerateAddressFeature(df, geolocator, model, GeoParameters):
     longitude, latitude = tbd.grid_to_centre([loncol, latcol], GeoParameters)
     df['longitude'] = longitude
     df['latitude'] = latitude
-
-    # 获取地址。
-    location = geolocator.reverse(f"{latitude}, {longitude}")
-    address = location.address
-
-    # 获取地址的embedding。
-    embedding = model.encode(address)
-    embedding = pd.Series(embedding)
-    
-    # series 是按照行进行合并。也就是 axis=0 。
-    df = pd.concat([df, embedding], axis=0)
 
     return df
 
@@ -318,13 +322,29 @@ def GetPekingUniversityPoIFeature():
 
     # --------------------这里添加从poi数据中获取的特征。-----------------------
     # 添加地址嵌入向量和经纬度。
+    """_summary_
+    生成地址携带的特征。因为单纯的poi特征没有表明方位信息，也就是说在东面的一个商场和西面的一个商场在poi特征上是一样的。但是他们距离用户的真实地址是不一样的。
+    同时地址表明了地理上人文属性，比如国家、省份等。
+    另外顺便也要将经纬度信息放入特征中，因为经纬度从另一个方面表明了相对的距离信息。同时经纬度有它的缺陷，明显的经纬度0-180之间有个突然的转换。所以只能作为特征一种。
+
+    步骤：
+    1. 通过 grid 和 transbigdata 换算出格栅中心的经纬度。
+    2. 通过 geopy 获得经纬度的地址。
+    3. 通过 sentence_transformers 将地址向量化。
+    4. 将经纬度和地址的向量化信息添加到poi特征中。
+    """
+    # 注意，partofPoIFeature 目前的列里面是没有grid列的。grid是作为index存在的。
     geolocator = Nominatim(user_agent="http")
     model = SentenceTransformer('sentence-transformers/distiluse-base-multilingual-cased-v2')
 
-    
     # 注意，partofPoIFeature 目前的列里面是没有grid列的。grid是作为index存在的。
-    partofPoIFeature = partofPoIFeature.apply(GenerateAddressFeature, 
-                                              geolocator=geolocator, model=model, GeoParameters=gGeoParameters, 
+    partofPoIFeature = partofPoIFeature.apply(GetLongitudeLatitude, GeoParameters=gGeoParameters, 
+                                              axis=1)
+    
+    partofPoIFeature = partofPoIFeature.apply(GetAddress, geolocator=geolocator, 
+                                              axis=1)
+    
+    partofPoIFeature = partofPoIFeature.apply(GenerateAddressEmbedding, model=model, 
                                               axis=1)
     # -------------------------------------------
 
@@ -335,9 +355,7 @@ def GetPekingUniversityPoIFeature():
 
     return partofPoIFeature
 
-
 ## 生成负面特征
-
 def DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|'):
     """_summary_
     去掉隐私数据处理。
@@ -397,6 +415,7 @@ def DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|'):
 
     # 单纯的数字不适合做分类名称，所以前面加一个标识nf_。表示nagetive feature的意思。
     NegativeFeature = NegativeFeature.apply(cc.AddStringIncolumn, columnName='icategory', content='nf_', axis=1)
+    NegativeFeature['category'] = NegativeFeature['icategory']
     NegativeFeature.drop(labels=['icategory'], axis=1, inplace=True)
 
     print(NegativeFeature.shape)
@@ -415,7 +434,6 @@ def PreprocessNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|'):
         return None
 
     NegativeFeature = DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|')
-    
     NegativeFeature['loncol'], NegativeFeature['latcol'] = tbd.GPS_to_grid(NegativeFeature['longitude'], NegativeFeature['latitude'], gGeoParameters)
     NegativeFeature = NegativeFeature.apply(cc.GenerateGrid, axis=1)
     
@@ -424,6 +442,7 @@ def PreprocessNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|'):
     print(NegativeFeature.shape)
 
     df = NegativeFeature[['category', 'grid']].copy()
+    print(df.shape)
     df['temp'] = 0
     df = df.pivot_table(index='grid',columns='category', values='temp', aggfunc='count').fillna(0)
     print(df.shape)
@@ -434,7 +453,6 @@ def PreprocessNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|'):
     df.to_csv(gPoINegativelFeatureSavePath)
     # df.sample(3)
     return df
-
 
 ## 合并所有的PoI特征
 
@@ -478,6 +496,14 @@ def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/'
     
     # print('\n Output PoI feature shape is {}. columns {}.\n'.format(PoIFeature.shape, PoIFeature.columns))
     PoIFeature.to_csv(gPoIFeatureSavePath)
+
+
+def CombineFeatures(ExistPoIFeature, NewPoIFeature):
+    
+    PoIFeature = pd.DataFrame()
+    PoIFeature = pd.concat([ExistPoIFeature, NewPoIFeature], axis=0).fillna(0.0)
+    PoIFeature.to_csv(gPoIFeatureSavePath)
+
 
 if __name__ == '__main__':
     startTime = datetime.datetime.now()
