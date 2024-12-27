@@ -7,116 +7,13 @@ import multiprocessing
 import json
 import datetime
 
+import CommonCode as cc
+
 # 通过经纬度获取地址。
 from geopy.geocoders import Nominatim
 # 将地址向量化。
 from sentence_transformers import SentenceTransformer, util
 
-
-## 小工具
-
-def findAllFile(base):
-    for root, ds, fs in os.walk(base):
-        for f in fs:
-            fullname = os.path.join(root, f)
-            yield fullname, root
-
-def AddStringIncolumn(df, columnName, content):
-    df[columnName] = '{}{}'.format(content, df[columnName])
-    return df
-
-def PrintStartInfo(functionName, description=''):
-    startTime = datetime.datetime.now()
-    print('Start function: {} ,pid: {} ,start at: {} .'.
-          format(functionName, os.getpid(), startTime.strftime('%Y-%m-%d %H:%M:%S')))
-    if description != '':
-        print(description)
-    return startTime
-
-def PrintEndInfo(functionName, startTime, description=''):
-    print('End function: {} ,pid: {} ,completed time: {} ,\n  \
-          consume time: {} .'.format(functionName, os.getpid(),
-                                     datetime.datetime.now(), 
-                                     datetime.datetime.now() - startTime))
-    if description != '':
-        print(description)
-
-def CantorPairingFunction(x, y):
-    """_summary_
-    先对x,y使用折叠函数，然后再计算2个数的cantor配对函数的值。
-    Args:
-        x (int): 整数。
-        y (int): 整数。
-
-    Returns:
-        int: 返回cantor配对数。
-    """
-    if x >= 0:
-        x = 2 * x
-    else:
-        x = 2 * abs(x) - 1
-    
-    if y >= 0:
-        y = 2 * y
-    else:
-        y = 2 * abs(y) - 1
-
-    return ((x + y) * (x + y + 1) // 2 + y)
-
-def CantorPairingInverseFunction(z):
-    """_summary_
-    先计算cantor配对函数反函数，然后x,y使用折叠反函数。
-    Args:
-        z (int): 两个数的cantor配对数值。
-
-    Returns:
-        x (int): 整数。
-        y (int): 整数。
-    """
-    if z < 0 :
-        print('CantorPairingInverseFunction input z is out of range.')
-        return 0, 0
-    
-    w = (math.sqrt(8 * z + 1) - 1) // 2
-    t = w * (w + 1) // 2
-    y = z - t
-    x = w - y
-    
-    if x % 2 == 0:
-        x = x / 2
-    else:
-        x = -((x + 1) / 2)
-    
-    if y % 2 == 0:
-        y = y / 2
-    else:
-        y = -((y + 1) / 2)
-
-    return int(x), int(y)
-
-def GenerateGrid(df, lonColName='loncol', latColName='latcol'):
-    """_summary_
-    将 康托 配对函数应用到dataframe上，生成grid。
-    Args:
-        df (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    df['grid'] = CantorPairingFunction(df[lonColName], df[latColName])
-    return df
-
-def RecoverLoncolLatcol(df):
-    """_summary_
-    将 康托 配对函数的反函数应用到dataframe上，生成行号和列号。
-    Args:
-        df (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    df['loncol'], df['latcol']= CantorPairingInverseFunction(df['grid'])
-    return df
 
 ## 加载超参数
 
@@ -309,7 +206,7 @@ def GenerateSinglePekingUniversityPoIFeature(FilePath, fileParameters, GeoParame
     df['category'] = df['category'].map(CategoryMapNumber)
     # 生成区域ID。
     df['loncol'], df['latcol'] = tbd.GPS_to_grid(df['longitude'],df['latitude'], GeoParameters)
-    df = df.apply(GenerateGrid, axis=1)
+    df = df.apply(cc.GenerateGrid, axis=1)
     # print('3')
     # 选取最终进行聚合的列。
     df = df[['category', 'grid']].copy()
@@ -345,7 +242,7 @@ def GenerateAddressFeature(df, geolocator, model, GeoParameters):
         _type_: _description_
     """
 
-    loncol, latcol = CantorPairingInverseFunction(df['grid'])
+    loncol, latcol = CantorPairingInverseFunction(df.name)
     longitude, latitude = tbd.grid_to_centre([loncol, latcol], GeoParameters)
     df['longitude'] = longitude
     df['latitude'] = latitude
@@ -369,7 +266,7 @@ def GetPekingUniversityPoIFeature():
     Returns:
         _type_: _description_
     """
-    startTime = PrintStartInfo(functionName='GetSocialPoIFeature()')
+    startTime = cc.PrintStartInfo(functionName='GetSocialPoIFeature()')
     # 检测POI特征的路径是否存在。不存在则返回。
     if os.path.exists(gPoIFolderPath) ==False:
         print('{} is not exist.'.format(gPoIFolderPath))
@@ -416,13 +313,16 @@ def GetPekingUniversityPoIFeature():
     # 将这部分PoI特征复制一份并返回。
     partofPoIFeature = gSharedData.dat.copy()
 
-    print(partofPoIFeature.columns)
+    # print('partofPoIFeature index {} , cols {}'.format(partofPoIFeature.index, partofPoIFeature.columns))
+    
 
     # --------------------这里添加从poi数据中获取的特征。-----------------------
     # 添加地址嵌入向量和经纬度。
     geolocator = Nominatim(user_agent="http")
     model = SentenceTransformer('sentence-transformers/distiluse-base-multilingual-cased-v2')
 
+    
+    # 注意，partofPoIFeature 目前的列里面是没有grid列的。grid是作为index存在的。
     partofPoIFeature = partofPoIFeature.apply(GenerateAddressFeature, 
                                               geolocator=geolocator, model=model, GeoParameters=gGeoParameters, 
                                               axis=1)
@@ -431,7 +331,7 @@ def GetPekingUniversityPoIFeature():
     # 保存。
     gSharedData.dat.to_csv(gPoISocialFeatureSavePath)
     
-    PrintEndInfo(functionName='GetSocialPoIFeature()', startTime=startTime)
+    cc.PrintEndInfo(functionName='GetSocialPoIFeature()', startTime=startTime)
 
     return partofPoIFeature
 
@@ -440,7 +340,7 @@ def GetPekingUniversityPoIFeature():
 
 def DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|'):
     """_summary_
-    完成脱敏处理。
+    去掉隐私数据处理。
     Args:
         FolderPath (str, optional): 数据文件存储文件夹. Defaults to './data/origin'.
         sep (str, optional): 分隔符. Defaults to '\|\+\+\|'.
@@ -449,7 +349,7 @@ def DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|'):
         pandas.DataFrame: 返回脱敏之后的数据。
     """
     NegativeFeature = pd.DataFrame()
-    for fullname, _ in findAllFile(FolderPath):
+    for fullname, _ in cc.findAllFile(FolderPath):
         temp = pd.read_table(fullname, 
                             sep=sep, 
                             names=['ID', 'category', 'subcategory', 'longitude', 'latitude'], 
@@ -496,7 +396,7 @@ def DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|'):
     NegativeFeature['category'] = ''
 
     # 单纯的数字不适合做分类名称，所以前面加一个标识nf_。表示nagetive feature的意思。
-    NegativeFeature = NegativeFeature.apply(AddStringIncolumn, columnName='icategory', content='nf_', axis=1)
+    NegativeFeature = NegativeFeature.apply(cc.AddStringIncolumn, columnName='icategory', content='nf_', axis=1)
     NegativeFeature.drop(labels=['icategory'], axis=1, inplace=True)
 
     print(NegativeFeature.shape)
@@ -517,7 +417,7 @@ def PreprocessNegativeFeature(FolderPath='./data/origin', sep='\|\+\+\|'):
     NegativeFeature = DropInforNegativePoI(FolderPath='./data/origin', sep='\|\+\+\|')
     
     NegativeFeature['loncol'], NegativeFeature['latcol'] = tbd.GPS_to_grid(NegativeFeature['longitude'], NegativeFeature['latitude'], gGeoParameters)
-    NegativeFeature = NegativeFeature.apply(GenerateGrid, axis=1)
+    NegativeFeature = NegativeFeature.apply(cc.GenerateGrid, axis=1)
     
     NegativeFeature = tbd.clean_outofbounds(NegativeFeature, bounds = gBounds, col = ['longitude', 'latitude'])
 
