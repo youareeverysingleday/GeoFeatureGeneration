@@ -264,7 +264,7 @@ def GetAddressByApply(df, geolocator, geocoder):
     Returns:
         _type_: _description_
     """
-    if (df['address'] == 'networkerror') or ('address' not in df.index):
+    if ('address' not in df.index) or (df['address'] == 'networkerror'):
         try:
             location = geolocator.reverse(f"{df['latitude']}, {df['longitude']}")
             df['address'] = location.address
@@ -288,7 +288,7 @@ def GetAddressByCycle(df):
     geocoder = BaiduV3(api_key='your baidu AK', timeout=200)
 
     for index, row in df.iterrows():
-        if (row['address'] == 'networkerror') or ('address' not in row.index):
+        if ('address' not in row.index) or (row['address'] == 'networkerror'):
             try:
                 location = geolocator.reverse(f"{row['latitude']}, {row['longitude']}")
                 df.loc[index, 'address'] = location.address
