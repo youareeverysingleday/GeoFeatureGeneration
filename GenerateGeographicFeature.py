@@ -12,6 +12,7 @@ import time
 
 # 通过经纬度获取地址。
 from geopy.geocoders import Nominatim
+from geopy.geocoders import BaiduV3
 # 将地址向量化。
 from sentence_transformers import SentenceTransformer, util
 
@@ -51,7 +52,7 @@ def GetParameters(parametersPath='./Parameters.json'):
     global gDeleteOutofBoundTrajectoryFlag
     global gSingleUserTrajectoryFeaturePath
     global gAllUsersTrajectoryFeaturePath
-    # global gFeaturePath
+    # global gFeaturePathCantorPairingI
     global gInteractionMatrixSavePath
     global gStaySavePath
     global gMoveSavePath
@@ -224,7 +225,11 @@ def GenerateSinglePekingUniversityPoIFeature(FilePath, fileParameters, GeoParame
         # 此时的index是grid，后面还需要聚合操作的，所以不能忽略。
         gSharedData.dat = pd.concat([gSharedData.dat, df]).fillna(0.0)
 
-def GetAddress(df, geolocator):
+
+# 由于网络原因和服务提供商提供的服务次数限制原因，所以需要加入网络和服务容错处理。
+# 不能使用pandas 的apply函数，因为不好缓存结果。
+# 将经纬度转换为地址使用openstreetmap 和 baiduv3 两种接口。
+def GetAddressByOpenstreetmap(df, geolocator):
     # 由于获取经纬度对应的地址需要通过互联网访问，可能API受到了限制，所以需要单独进行处理。
     try:
         # 获取地址。
@@ -232,20 +237,83 @@ def GetAddress(df, geolocator):
         df['address'] = location.address
     except:
         df['address'] = 'networkerror'
-        print('grid {} network error.'.format(df.name))
+        print('grid {} openstreetmap network error.'.format(df.name))
         time.sleep(1)
     return df
+
+
+def GetAddressByBaiduV3(df):
+    geocoder = BaiduV3(api_key='your baidu AK', timeout=200)
+    try:
+        location = geocoder.reverse(f"{df['longitude']}, {df['latitude']}")
+        df['address'] = location.raw['formatted_address']
+    except:
+        df['address'] = 'networkerror'
+        print('grid {} baidu network error.'.format(df.name))
+        time.sleep(1)
+    return df
+
+def GetAddressByApply(df, geolocator, geocoder):
+    """_summary_
+    使用 apply 的方式来将地址转为经纬度。
+    Args:
+        df (_type_): _description_
+        geolocator (_type_): _description_
+        geocoder (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    if (df['address'] == 'networkerror') or ('address' not in df.index):
+        try:
+            location = geolocator.reverse(f"{df['latitude']}, {df['longitude']}")
+            df['address'] = location.address
+        except:
+            try:
+                location = geocoder.reverse(f"{df['longitude']}, {df['latitude']}")
+                df['address'] = location.raw['formatted_address']
+            except:
+                df['address'] = 'networkerror'
+                print('grid {} baidu network error.'.format(df.name))
+    return df
+
+
+def GetAddressByCycle(df):
+    """_summary_
+    使用循环的方式来将经纬度转换为地址。
+    Args:
+        df (_type_): _description_
+    """
+    geolocator = Nominatim(user_agent="http", timeout=200)
+    geocoder = BaiduV3(api_key='your baidu AK', timeout=200)
+
+    for index, row in df.iterrows():
+        if (row['address'] == 'networkerror') or ('address' not in row.index):
+            try:
+                location = geolocator.reverse(f"{row['latitude']}, {row['longitude']}")
+                df.loc[index, 'address'] = location.address
+            except:
+                try:
+                    location = geocoder.reverse(f"{row['longitude']}, {row['latitude']}")
+                    df.loc[index, 'address'] = location.raw['formatted_address']
+                except:
+                    df.loc[index, 'address'] = 'networkerror'
+                    print('grid {} baidu network error.'.format(row.name))
+        else:
+            continue
+
 
 def GenerateAddressEmbedding(df, model, vectorLength=512):
 
     if df['address'] == 'networkerror':
         embedding = pd.Series(data=[0]*vectorLength)
+        df = pd.concat([df, embedding], axis=0)
     else:
         embedding = model.encode(df['address'])
         embedding = pd.Series(embedding)
         df = pd.concat([df, embedding], axis=0)
 
-        return df
+    return df
 
 def GetLongitudeLatitude(df, GeoParameters):
     """_summary_
@@ -257,7 +325,7 @@ def GetLongitudeLatitude(df, GeoParameters):
         _type_: _description_
     """
 
-    loncol, latcol = CantorPairingInverseFunction(df.name)
+    loncol, latcol = cc.CantorPairingInverseFunction(df.name)
     longitude, latitude = tbd.grid_to_centre([loncol, latcol], GeoParameters)
     df['longitude'] = longitude
     df['latitude'] = latitude
@@ -335,14 +403,19 @@ def GetPekingUniversityPoIFeature():
     """
     # 注意，partofPoIFeature 目前的列里面是没有grid列的。grid是作为index存在的。
     geolocator = Nominatim(user_agent="http")
+    geocoder = BaiduV3(api_key='qDk9tULk77Oq75YtjGNYLMcd9MWbTCGG', timeout=200)
+
     model = SentenceTransformer('sentence-transformers/distiluse-base-multilingual-cased-v2')
 
     # 注意，partofPoIFeature 目前的列里面是没有grid列的。grid是作为index存在的。
     partofPoIFeature = partofPoIFeature.apply(GetLongitudeLatitude, GeoParameters=gGeoParameters, 
                                               axis=1)
     
-    partofPoIFeature = partofPoIFeature.apply(GetAddress, geolocator=geolocator, 
-                                              axis=1)
+    # partofPoIFeature = partofPoIFeature.apply(GetAddressByOpensteetmap, geolocator=geolocator, 
+    #                                           axis=1)
+
+    partofPoIFeature= partofPoIFeature.apply(GetAddressByApply, geolocator=geolocator, geocoder=geocoder, 
+                                             axis=1)
     
     partofPoIFeature = partofPoIFeature.apply(GenerateAddressEmbedding, model=model, 
                                               axis=1)
