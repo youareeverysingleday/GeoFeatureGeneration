@@ -46,7 +46,7 @@ def GetParameters(parametersPath='./Parameters.json'):
     global gUserList
     global gOutputProecessedTrajectory
     global gInputTrajectoryCsvSavePath
-    global gOutpuyPath
+    global gOutputPath
     global gSamplingIntervalRow
     global gSaveUserTrajectoryFlag
     global gDeleteOutofBoundTrajectoryFlag
@@ -131,7 +131,7 @@ def GetParameters(parametersPath='./Parameters.json'):
     # 所有用户的保存目录。
     gInputTrajectoryCsvSavePath = Parameters['gInputTrajectoryCsvSavePath']
     # 保存的输出的根目录。
-    gOutpuyPath = Parameters['gOutpuyPath']
+    gOutputPath = Parameters['gOutputPath']
     # TrajectoriesBasePath = './Data/Geolife Trajectories 1.3/Data/'
     
     
@@ -572,6 +572,18 @@ def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/'
 
 
 def ProcessNetworkErrorApply(df, geolocator, geocoder, model, vectorLength=512):
+    """_summary_
+    处理网络错误导致的经纬度转地址错误的pandas apply函数。
+    Args:
+        df (pandas.DataFrame): 输出数据集。
+        geolocator (_type_): openstreetmap的geolocator。
+        geocoder (_type_): baiduv3的geocoder。
+        model (_type_): 地址转为向量的模型。
+        vectorLength (int, optional): 第一次处理PoI数据后embedding的长度. Defaults to 512.
+
+    Returns:
+        pandas.DataFrame: _description_
+    """
     if df['address'] == 'networkerror':
         print('grid:{} error.'.format(df.name))
         try:
@@ -597,11 +609,16 @@ def ProcessNetworkErrorApply(df, geolocator, geocoder, model, vectorLength=512):
         
     return df
 
-def ProcessNetworkError(PoIFeaturePath='./Data/Output/PoIFeature.csv'):
+def ProcessNetworkError(PoIFeaturePath='./Data/Output/PoIFeature.csv',
+                        PoIFeatureSavePath='./Data/Output/PoIFeature.csv'):
     """_summary_
     处理网络错误导致的经纬度转地址错误。
+    这个函数不在main中运行，而是等main处理完成之后，再查漏补缺的。而且每天经纬度转地址是有次数限制的。
+    注意保存的路径和读入的路径是不一样的。因为不能确定在处理经纬度转地址的过程中不出现错误。
+    Args:
+        PoIFeaturePath (str, optional): 第一次生成PoI特征时的路径. Defaults to './Data/Output/PoIFeature.csv'.
+        PoIFeatureSavePath (str, optional): 处理网络故障之后保存PoI特征时的路径. Defaults to './Data/Output/PoIFeature2.csv'.
     """
-    
     PoIFeature = pd.read_csv(PoIFeaturePath, index_col=0)
     geolocator = Nominatim(user_agent="http")
     geocoder = BaiduV3(api_key='your ak', timeout=200)
@@ -611,16 +628,15 @@ def ProcessNetworkError(PoIFeaturePath='./Data/Output/PoIFeature.csv'):
                                   model=model, 
                                   vectorLength=512,
                                   axis=1)
-    
+    # 删除地址的文字列。
+    PoIFeature.drop(columns=['address'], inplace=True)
+    PoIFeature.to_csv(PoIFeatureSavePath)
     print("Completed.")
 
-
-def CombineFeatures(ExistPoIFeature, NewPoIFeature):
-    
-    PoIFeature = pd.DataFrame()
-    PoIFeature = pd.concat([ExistPoIFeature, NewPoIFeature], axis=0).fillna(0.0)
-    PoIFeature.to_csv(gPoIFeatureSavePath)
-
+# def CombineFeatures(ExistPoIFeature, NewPoIFeature):
+#     PoIFeature = pd.DataFrame()
+#     PoIFeature = pd.concat([ExistPoIFeature, NewPoIFeature], axis=0).fillna(0.0)
+#     PoIFeature.to_csv(gPoIFeatureSavePath)
 
 if __name__ == '__main__':
     startTime = datetime.datetime.now()

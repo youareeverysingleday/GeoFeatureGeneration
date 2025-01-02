@@ -58,7 +58,7 @@
     "gTrajectoryFolderPath": "./Data/Geolife Trajectories 1.3/Data/",
     "gOutputProecessedTrajectory": "./Data/Output/ProcessedTrajectories/{}.csv",
     "gInputTrajectoryCsvSavePath": "./Data/Output/Trajectories/{}.csv",
-    "gOutpuyPath": "./Data/Output/",
+    "gOutputPath": "./Data/Output/",
     "gSaveUserTrajectoryFlag": true,
     "gDeleteOutofBoundTrajectoryFlag": true,
     "gSingleUserTrajectoryFeaturePath": "./Data/Output/TrajectoryFeature/{}.csv",
@@ -73,5 +73,6 @@
         "FeatureSeries",
         "InteractionMatrix",
         "TrajectoryGraph"
-    ]
+    ],
+    "gRefreshDataFlag":false
 }
