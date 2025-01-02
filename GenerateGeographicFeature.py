@@ -390,20 +390,20 @@ def GetPekingUniversityPoIFeature():
 
     # --------------------这里添加从poi数据中获取的特征。-----------------------
     # 添加地址嵌入向量和经纬度。
-    """_summary_
-    生成地址携带的特征。因为单纯的poi特征没有表明方位信息，也就是说在东面的一个商场和西面的一个商场在poi特征上是一样的。但是他们距离用户的真实地址是不一样的。
-    同时地址表明了地理上人文属性，比如国家、省份等。
-    另外顺便也要将经纬度信息放入特征中，因为经纬度从另一个方面表明了相对的距离信息。同时经纬度有它的缺陷，明显的经纬度0-180之间有个突然的转换。所以只能作为特征一种。
 
-    步骤：
-    1. 通过 grid 和 transbigdata 换算出格栅中心的经纬度。
-    2. 通过 geopy 获得经纬度的地址。
-    3. 通过 sentence_transformers 将地址向量化。
-    4. 将经纬度和地址的向量化信息添加到poi特征中。
-    """
+    # 生成地址携带的特征。因为单纯的poi特征没有表明方位信息，也就是说在东面的一个商场和西面的一个商场在poi特征上是一样的。但是他们距离用户的真实地址是不一样的。
+    # 同时地址表明了地理上人文属性，比如国家、省份等。
+    # 另外顺便也要将经纬度信息放入特征中，因为经纬度从另一个方面表明了相对的距离信息。同时经纬度有它的缺陷，明显的经纬度0-180之间有个突然的转换。所以只能作为特征一种。
+
+    # 步骤：
+    # 1. 通过 grid 和 transbigdata 换算出格栅中心的经纬度。
+    # 2. 通过 geopy 获得经纬度的地址。
+    # 3. 通过 sentence_transformers 将地址向量化。
+    # 4. 将经纬度和地址的向量化信息添加到poi特征中。
+
     # 注意，partofPoIFeature 目前的列里面是没有grid列的。grid是作为index存在的。
     geolocator = Nominatim(user_agent="http")
-    geocoder = BaiduV3(api_key='qDk9tULk77Oq75YtjGNYLMcd9MWbTCGG', timeout=200)
+    geocoder = BaiduV3(api_key='your baidu AK', timeout=200)
 
     model = SentenceTransformer('sentence-transformers/distiluse-base-multilingual-cased-v2')
 
@@ -569,6 +569,50 @@ def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/'
     
     # print('\n Output PoI feature shape is {}. columns {}.\n'.format(PoIFeature.shape, PoIFeature.columns))
     PoIFeature.to_csv(gPoIFeatureSavePath)
+
+
+def ProcessNetworkErrorApply(df, geolocator, geocoder, model, vectorLength=512):
+    if df['address'] == 'networkerror':
+        print('grid:{} error.'.format(df.name))
+        try:
+            location = geolocator.reverse(f"{df['latitude']}, {df['longitude']}")
+            df['address'] = location.address
+            
+            embedding = model.encode(df['address'])
+            embedding = pd.Series(embedding)
+            df[-vectorLength:] = embedding
+            time.sleep(1)
+        except:
+            try:
+                location = geocoder.reverse(f"{df['longitude']}, {df['latitude']}")
+                df['address'] = location.raw['formatted_address']
+                
+                embedding = model.encode(df['address'])
+                embedding = pd.Series(embedding)
+                df[-vectorLength:] = embedding
+                time.sleep(1)
+            except:
+                df['address'] = 'networkerror'
+                print('grid {} both openstreetmap and baidu are network error.'.format(df.name))
+        
+    return df
+
+def ProcessNetworkError(PoIFeaturePath='./Data/Output/PoIFeature.csv'):
+    """_summary_
+    处理网络错误导致的经纬度转地址错误。
+    """
+    
+    PoIFeature = pd.read_csv(PoIFeaturePath, index_col=0)
+    geolocator = Nominatim(user_agent="http")
+    geocoder = BaiduV3(api_key='your ak', timeout=200)
+    model = SentenceTransformer('sentence-transformers/distiluse-base-multilingual-cased-v2')
+    
+    PoIFeature = PoIFeature.apply(ProcessNetworkErrorApply, geolocator=geolocator, geocoder=geocoder, 
+                                  model=model, 
+                                  vectorLength=512,
+                                  axis=1)
+    
+    print("Completed.")
 
 
 def CombineFeatures(ExistPoIFeature, NewPoIFeature):
