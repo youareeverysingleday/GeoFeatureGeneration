@@ -120,6 +120,11 @@ This package can not run in jupyter, because package has used "mulitprocessing".
       - 图片描述：POI的图片或视觉描述特征。
       - 地标性：POI是否具有标志性特征（如著名景点）。
       - 通过对这些特征的提取和分析，可以为推荐系统、城市规划、商圈分析等应用场景提供有效支持。
+12. foursquare 数据处理参考：
+    1. <https://www.kaggle.com/code/ryotayoshinobu/foursquare-lightgbm-baseline>
+    2. 重点-<https://zhuanlan.zhihu.com/p/540416289>
+    3. <https://github.com/hobbitlab/Foursquare-Location-Matching>
+    4. <https://jishu.proginn.com/doc/7780647801f904d12>
 
 ## Function desrciption
 
