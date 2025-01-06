@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 import transbigdata as tbd
 import os
-# import math
+# display polars' progress bar.
+os.environ['POLARS_VERBOSE'] = '1'
+import math
 import multiprocessing
 import json
 import datetime
@@ -447,6 +449,67 @@ def PreprocessTrajectory(userRange,
         # return MultiTrajectorys_pd
 
 ## --- 将特征附着到轨迹上 ---
+import polars as pl
+def AttachFeaturetoSingleUserTrajectoryByPolars(PoIFeature, user):
+
+    startTime = PrintStartInfo(functionName='AttachFeaturetoSingleUserTrajectoryByPolars()')
+
+    userTrajectory = pl.read_csv(gOutputProecessedTrajectory.format(user), 
+                                 has_header=True).lazy()
+    userTrajectory = userTrajectory.with_columns(pl.col('grid').cast(pl.Int32))
+    userTrajectory = userTrajectory.join(PoIFeature, 
+                                         on='grid', how='left').fill_nan(0)
+    
+    userTrajectory = userTrajectory.collect(type_coercion=True,
+                                            projection_pushdown=True)
+    userTrajectory.write_csv(gSingleUserTrajectoryFeaturePath.format(user))
+    PrintEndInfo(functionName='AttachFeaturetoSingleUserTrajectoryByPolars()', startTime=startTime)
+
+def AttachFeaturetoAllUsersTrajectoryByPolars():
+    PoIFeature = pl.read_csv(gPoIFeatureSavePath, has_header=True).lazy()
+    PoIFeature = PoIFeature.rename({PoIFeature.collect_schema().names()[0]: 'grid'})
+    # PoIFeature.collect()
+    PoIFeature = PoIFeature.with_columns(pl.col('grid').cast(pl.Int32))
+    # PoIFeature_lazy = PoIFeature.lazy()
+    PoIFeature.collect()
+
+    AllUsersTrajectory = pl.read_csv(gOutpuyPath + 'Trajectory_all.csv', 
+                                     has_header=True).lazy()
+    AllUsersTrajectory = AllUsersTrajectory.with_columns(pl.col('grid').cast(pl.Int32))
+    AllUsersTrajectory = AllUsersTrajectory.join(PoIFeature, 
+                                                 on='grid', how='left').fill_nan(0)
+    
+    AllUsersTrajectory = AllUsersTrajectory.collect(type_coercion=True,
+                                                    projection_pushdown=True)
+    AllUsersTrajectory.write_csv(gAllUsersTrajectoryFeaturePath)
+
+    print('AttachFeaturetoAllUsersTrajectoryByPolars completed.')
+    # return merge_chunk
+
+
+def AttachFeaturetoSingleUserTrajectoryByPolarsMultiProccess(user):
+    """_summary_
+    将特征附着到单个用户的轨迹上。在multiprocessing中使用。
+    Args:
+        user (_type_): 用户ID。
+    """
+    print('p mp {} start'.format(user))
+    PoIFeature = pl.read_csv(gPoIFeatureSavePath, has_header=True).lazy()
+    PoIFeature = PoIFeature.rename({PoIFeature.collect_schema().names()[0]: 'grid'})
+    # PoIFeature.collect()
+    PoIFeature = PoIFeature.with_columns(pl.col('grid').cast(pl.Int32))
+    PoIFeature.collect()
+
+    userTrajectory = pl.read_csv(gOutputProecessedTrajectory.format(user), 
+                                 has_header=True).lazy()
+    userTrajectory = userTrajectory.with_columns(pl.col('grid').cast(pl.Int32))
+    userTrajectory = userTrajectory.join(PoIFeature, 
+                                         on='grid', how='left').fill_nan(0)
+    
+    userTrajectory = userTrajectory.collect(type_coercion=True,
+                                            projection_pushdown=True)
+    userTrajectory.write_csv(gSingleUserTrajectoryFeaturePath.format(user))
+    print('polars multiproccess {} completed.'.format(user))
 
 def AttachFeaturetoSingleUserTrajectory(user):
     """_summary_
@@ -489,11 +552,21 @@ def AttachFeaturetoTrajectory(outputType='merged', chunksize = 250):
     # 输出每个用户各自的附着了特征之后的轨迹。
     if outputType == 'independent':
         userList = gUserList
+        # ---
         ProcessPool = multiprocessing.Pool()
-        ProcessPool.map(AttachFeaturetoSingleUserTrajectory, userList)
+        ProcessPool.map(AttachFeaturetoSingleUserTrajectoryByPolarsMultiProccess, userList)
 
         ProcessPool.close()
         ProcessPool.join()
+        # ---
+
+        # ---
+        # for user in userList:
+        #     AttachFeaturetoSingleUserTrajectoryByPolars(PoIFeature, user)
+        # ---
+        print('AttachFeaturetoTrajectory independent {} completed.'.format(datetime.datetime.now()))
+        
+
     # 输出所有用户附着了特征之后的轨迹为一个文件。
     elif outputType == 'merged':
         # usersTrajectory = pd.read_csv(gOutputPath + 'Trajectory_all.csv', index_col=0)
@@ -501,33 +574,26 @@ def AttachFeaturetoTrajectory(outputType='merged', chunksize = 250):
         # 将index列赋值给一个新的grid列。
         # PoIFeature['grid'] = PoIFeature.index
 
-        usersTrajectory = pd.DataFrame()
-        chunks = pd.read_csv(gOutputPath + 'Trajectory_all.csv', 
-                             index_col=0, 
-                             chunksize=chunksize)
-        ProcessPool = multiprocessing.Pool()
-        results = ProcessPool.map(MergeUsersTrajectoryandPoIFeature, chunks)
+        # ---
+        # usersTrajectory = pd.DataFrame()
+        # chunks = pd.read_csv(gOutpuyPath + 'Trajectory_all.csv', 
+        #                      index_col=0, 
+        #                      chunksize=chunksize)
+        # ProcessPool = multiprocessing.Pool()
+        # results = ProcessPool.map(MergeUsersTrajectoryandPoIFeature, chunks)
 
-        ProcessPool.close()
-        ProcessPool.join()
+        # ProcessPool.close()
+        # ProcessPool.join()
 
-        for result in results:
-            usersTrajectory = pd.concat([usersTrajectory, result])
-        # print('\n User trajectory feature shape is {} after attach PoI feature. \n'.format(usersTrajectory.shape))
-        usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
-        
-        # meged_df = pd.DataFrame()
-        # for chunk in pd.read_csv(gOutputPath + 'Trajectory_all.csv', 
-        #                          chunksize=500,
-        #                          index_col=0):
-        #     merge_chunk = pd.merge(chunk, PoIFeature, on='grid', how='left').fillna(0)
-        #     meged_df = pd.concat([meged_df, merge_chunk])
-        # direct use merge can cause the memory explosion.
-        # usersTrajectory = usersTrajectory.merge(PoIFeature, 
-        #                                         on='grid', how='left').fillna(0)
+        # for result in results:
+        #     usersTrajectory = pd.concat([usersTrajectory, result])
+        # # print('\n User trajectory feature shape is {} after attach PoI feature. \n'.format(usersTrajectory.shape))
+        # usersTrajectory.to_csv(gAllUsersTrajectoryFeaturePath)
+        # ---
+        AttachFeaturetoAllUsersTrajectoryByPolars()
+        print('AttachFeaturetoTrajectory merged {} completed.'.format(datetime.datetime.now()))
 
-        # meged_df.to_csv(gAllUsersTrajectoryFeaturePath)
-    cc.PrintEndInfo(functionName='AttachFeaturetoTrajectory()', startTime=startTime)
+    PrintEndInfo(functionName='AttachFeaturetoTrajectory()', startTime=startTime)
 
 # --- 输出其他格式 ---
 
@@ -954,6 +1020,7 @@ if __name__ == '__main__':
     AttachFeaturetoTrajectory(outputType='independent')
     endTime30 = datetime.datetime.now()
     print("AttachFeaturetoTrajectory independent completed. {}".format(endTime30 - endTime2))
+    
     AttachFeaturetoTrajectory(outputType='merged')
     endTime31 = datetime.datetime.now()
     print("AttachFeaturetoTrajectory merged completed. {}".format(endTime31 - endTime2))
@@ -970,9 +1037,15 @@ if __name__ == '__main__':
     # test gfg.gUserList = ['079', '047']
     gDeleteOutofBoundTrajectoryFlag = True
     GenerateStayMove(ProcessType='independent')
+    endTime50 = datetime.datetime.now()
+    print("AttachFeaturetoTrajectory independent completed. {}".format(endTime50 - endTime4))
+    
     GenerateStayMove(ProcessType='merged')
+    endTime51 = datetime.datetime.now()
+    print("AttachFeaturetoTrajectory independent completed. {}".format(endTime51 - endTime50))
+    
     endTime5 = datetime.datetime.now()
-    print("GenerateStayMove completed. {}".format(endTime5 - endTime4))
+    print("GenerateStayMove completed. {}".format(endTime5 - endTime51))
 
     GenerateFeatureMatrix(ProcessType='independent')
     endTime6 = datetime.datetime.now()
