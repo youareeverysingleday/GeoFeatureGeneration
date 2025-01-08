@@ -125,6 +125,9 @@ This package can not run in jupyter, because package has used "mulitprocessing".
     2. 重点-<https://zhuanlan.zhihu.com/p/540416289>
     3. <https://github.com/hobbitlab/Foursquare-Location-Matching>
     4. <https://jishu.proginn.com/doc/7780647801f904d12>
+13. 需要使用polars来完全替换pandas。因为polars速度确实快（至少缩短了2个数量级的时间）。
+    1. 还不能完全替换，因为tranbigdata使用的是pandas。
+    2. 但merge操作肯定需要替换的。
 
 ## Function desrciption
 
@@ -173,6 +176,7 @@ This package can concat multi vectorized features to one matrix.
 
 .
 ├─ README.md
+├─ CommonCode.py # 公用代码。
 ├─ GenerateGeographicFeature.py # 特征生成。
 ├─ AttachFeature.py # 特征附着到轨迹上。
 ├─ Parameters.json
@@ -221,14 +225,16 @@ This package can concat multi vectorized features to one matrix.
 
 | num | package                | version |
 | --- | ---------------------- | ------- |
-| 1   | pandas                 |         |
-| 2   | numpy                  |         |
+| 1   | pandas                 | 2.2.3   |
+| 2   | numpy                  | 2.0.2   |
 | 3   | multiprocessing/python | python >=3.9   |
 | 4   | geopandas              |         |
 | 5   | json                   |         |
 | 6   | datetime               |         |
-| 7   | transbigdata           |         |
-| 8   |                        |         |
+| 7   | transbigdata           |  0.5.3  |
+| 8   | polars              | 1.19.0  |
+|     |                        |         |
+|     |                        |         |
 |     |                        |         |
 
 ## Test dataset

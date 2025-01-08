@@ -1,6 +1,7 @@
 import os
 import math
 import datetime
+import polars as pl
 
 ## 小工具
 
@@ -105,4 +106,93 @@ def RecoverLoncolLatcol(df):
         _type_: _description_
     """
     df['loncol'], df['latcol']= CantorPairingInverseFunction(df['grid'])
+    return df
+
+def CantorPairingFunctionInPolars(row):
+    """_summary_
+    使用polars来实现康托尔函数。
+    Args:
+        row (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    if row['loncol'] >= 0:
+        x = 2 * row['loncol']
+    else:
+        x = 2 * abs(row['loncol']) - 1
+    
+    if row['latcol'] >= 0:
+        y = 2 * row['latcol']
+    else:
+        y = 2 * abs(row['latcol']) - 1
+
+    return ((x + y) * (x + y + 1) // 2 + y)
+
+
+def CantorPairingInverseFunctionInPolars(row):
+    """_summary_
+    使用polars来实现康托尔函数的反函数。注意返回的值是2行。
+    Args:
+        row (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    z = row['grid']
+    if z < 0 :
+        print('CantorPairingInverseFunction input z is out of range.')
+        return 0, 0
+    
+    w = (math.sqrt(8 * z + 1) - 1) // 2
+    t = w * (w + 1) // 2
+    y = z - t
+    x = w - y
+    
+    if x % 2 == 0:
+        x = x / 2
+    else:
+        x = -((x + 1) / 2)
+    
+    if y % 2 == 0:
+        y = y / 2
+    else:
+        y = -((y + 1) / 2)
+
+    return {'loncol':int(x), 'latcol':int(y)}
+
+
+def GenerateGridInPolars(df, lonColName='loncol', latColName='latcol'):
+    """_summary_
+    将 康托 配对函数应用到dataframe上，生成grid。
+    Args:
+        df (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    
+    df = df.with_columns(
+        pl.struct([lonColName, latColName]).map_elements(CantorPairingFunctionInPolars, return_dtype=pl.Int64).alias("grid")
+    )
+
+    return df
+
+def RecoverLoncolLatcolInPolars(df):
+    """_summary_
+    将 康托 配对函数的反函数应用到dataframe上，生成行号和列号。
+    Args:
+        df (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    
+    df = df.with_columns(
+        pl.struct(["grid"])
+        .map_elements(CantorPairingInverseFunction, return_dtype=pl.Struct({"loncol": pl.Int64, "latcol": pl.Int64}))
+        .alias("new_columns")
+    )
+    df = df.unnest("new_columns")
+    
     return df

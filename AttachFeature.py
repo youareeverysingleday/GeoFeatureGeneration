@@ -1021,6 +1021,7 @@ if __name__ == '__main__':
     endTime30 = datetime.datetime.now()
     print("AttachFeaturetoTrajectory independent completed. {}".format(endTime30 - endTime2))
     
+    # consume 00:24:43.88 .
     AttachFeaturetoTrajectory(outputType='merged')
     endTime31 = datetime.datetime.now()
     print("AttachFeaturetoTrajectory merged completed. {}".format(endTime31 - endTime2))
