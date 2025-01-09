@@ -88,10 +88,10 @@ def GenerateGrid(df, lonColName='loncol', latColName='latcol'):
     """_summary_
     将 康托 配对函数应用到dataframe上，生成grid。
     Args:
-        df (_type_): _description_
+        df (pandas.DataFrame): _description_
 
     Returns:
-        _type_: _description_
+        pandas.DataFrame: _description_
     """
     df['grid'] = CantorPairingFunction(df[lonColName], df[latColName])
     return df
@@ -100,10 +100,10 @@ def RecoverLoncolLatcol(df):
     """_summary_
     将 康托 配对函数的反函数应用到dataframe上，生成行号和列号。
     Args:
-        df (_type_): _description_
+        df (pandas.DataFrame): _description_
 
     Returns:
-        _type_: _description_
+        pandas.DataFrame: _description_
     """
     df['loncol'], df['latcol']= CantorPairingInverseFunction(df['grid'])
     return df
@@ -161,38 +161,33 @@ def CantorPairingInverseFunctionInPolars(row):
 
     return {'loncol':int(x), 'latcol':int(y)}
 
-
 def GenerateGridInPolars(df, lonColName='loncol', latColName='latcol'):
     """_summary_
     将 康托 配对函数应用到dataframe上，生成grid。
     Args:
-        df (_type_): _description_
+        df (polars.DataFrame): _description_
 
     Returns:
-        _type_: _description_
+        polars.DataFrame: _description_
     """
-    
     df = df.with_columns(
         pl.struct([lonColName, latColName]).map_elements(CantorPairingFunctionInPolars, return_dtype=pl.Int64).alias("grid")
     )
-
     return df
 
 def RecoverLoncolLatcolInPolars(df):
     """_summary_
     将 康托 配对函数的反函数应用到dataframe上，生成行号和列号。
     Args:
-        df (_type_): _description_
+        df (polars.DataFrame): _description_
 
     Returns:
-        _type_: _description_
+        polars.DataFrame: _description_
     """
-    
     df = df.with_columns(
         pl.struct(["grid"])
         .map_elements(CantorPairingInverseFunction, return_dtype=pl.Struct({"loncol": pl.Int64, "latcol": pl.Int64}))
         .alias("new_columns")
     )
     df = df.unnest("new_columns")
-    
     return df

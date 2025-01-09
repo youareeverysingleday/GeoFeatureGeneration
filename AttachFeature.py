@@ -1,4 +1,5 @@
 import pandas as pd
+import polars as pl
 import numpy as np
 import transbigdata as tbd
 import os
@@ -449,7 +450,7 @@ def PreprocessTrajectory(userRange,
         # return MultiTrajectorys_pd
 
 ## --- 将特征附着到轨迹上 ---
-import polars as pl
+
 def AttachFeaturetoSingleUserTrajectoryByPolars(PoIFeature, user):
 
     startTime = PrintStartInfo(functionName='AttachFeaturetoSingleUserTrajectoryByPolars()')
@@ -602,17 +603,27 @@ def GenerateInteractionMatrix():
     生成交互矩阵。
     """
     startTime = cc.PrintStartInfo(functionName='GenerateInteractionMatrix()')
-    Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, index_col=0)
+    Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
+                            #    index_col=0,
+                               usecols=['latitude', 'grid', 'userID', 'longitude'])
     # 是否删除所有范围之外的地点。
     if gDeleteOutofBoundTrajectoryFlag == True:
         Trajectories = tbd.clean_outofbounds(Trajectories, gBounds, col=['longitude', 'latitude'])
     # 选择最终进行透视的列。'latitude'列只是作为最后 aggfunc='count' 的存在。
-    Trajectories = Trajectories[['grid', 'userID', 'latitude']]
-    InteractionMatrix = Trajectories.pivot_table(index='userID',columns='grid', 
-                                                 values='latitude', aggfunc='count').fillna(0).copy()
-    # 保存。
-    InteractionMatrix.to_csv(gOutputPath + 'InteractionMatrix.csv')
-    cc.PrintEndInfo(functionName='GenerateInteractionMatrix()', startTime=startTime)
+    # Trajectories = Trajectories[['grid', 'userID', 'latitude']]
+    # InteractionMatrix = Trajectories.pivot_table(index='userID',columns='grid', 
+    #                                              values='latitude', aggfunc='count').fillna(0).copy()
+    # # 保存。
+    # InteractionMatrix.to_csv(gOutpuyPath + 'InteractionMatrix.csv')
+
+    Trajectories = pl.from_pandas(Trajectories[['grid', 'userID', 'latitude']])
+    InteractionMatrix = Trajectories.pivot(index='userID', 
+                                           on='grid', 
+                                           values='latitude', 
+                                           aggregate_function='len')
+    InteractionMatrix.write_csv(gOutpuyPath + 'InteractionMatrix.csv')
+
+    PrintEndInfo(functionName='GenerateInteractionMatrix()', startTime=startTime)
 
 # 将numpy.narray的3维数据保存为csv格式。
 def np_3d_to_csv(data, 
@@ -757,7 +768,7 @@ def GenerateSingleUserStayMove(user):
                                  parse_dates=['entireTime'])
     # print('\n 2 {} UserTrajectory shape is {}. \n'.format(user ,userTrajectory.shape))
     # print('\n ---2 {} UserTrajectory shape is {}. \n'.format(user ,userTrajectory.shape))
-    
+    columns = userTrajectory.columns
     # 首先判断轨迹是否为空。也就是用户的轨迹都在设置的区域之外。118, 132, 160三个用户在设置区域之外。
     if userTrajectory.shape[0] == 0:
         stay = pd.DataFrame(columns=['userID', 'stime', 'LONCOL', 'LATCOL', 'etime',
@@ -798,11 +809,25 @@ def GenerateSingleUserStayMove(user):
             # 生成时间特征。时间戳的特征也会在后面获取。
             stay = stay.apply(GenerateTimeFeature, axis=1)
 
-            # 读取所有特征。
-            PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
-            PoIFeature['grid'] = PoIFeature.index
-            # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-            stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+
+            # # 读取所有特征。
+            # PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
+            # PoIFeature['grid'] = PoIFeature.index
+            # # 将通过PoI获得的特征以及其他特征和停留点特征合并。
+            # # mmm
+            # stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+
+            PoIFeature = pl.read_csv(gPoIFeatureSavePath, has_header=True).lazy()
+            PoIFeature = PoIFeature.rename({PoIFeature.collect_schema().names()[0]: 'grid'})
+            PoIFeature = PoIFeature.with_columns(pl.col('grid').cast(pl.Int32))
+            PoIFeature.collect()
+            stay = pl.from_pandas(stay).lazy()
+            stay = stay.join(PoIFeature,
+                             on='grid', how='left').fill_nan(0)
+            stay = stay.collect(type_coercion=True,
+                                projection_pushdown=True)
+            stay = stay.to_pandas()
+
 
         if move.shape[0] == 0:
             move = pd.DataFrame(columns=['userID', 'SLONCOL', 'SLATCOL', 'stime', 'slon', 
@@ -850,16 +875,29 @@ def GenerateStayMoveByChunk(chunk):
 
     # 读取所有特征。
     # tbd.traj_stay_move() drop other feature. so must merge PoI feature again.
-    PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
-    PoIFeature['grid'] = PoIFeature.index
+    # PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
+    # PoIFeature['grid'] = PoIFeature.index
 
     # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-    stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
+    # mmm
+    # stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
     # move contain feature of start place and feature of end place.
     # so, feature of move need special process.
     # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
 
     # PrintEndInfo('GenerateStayMoveByChunk()', startTime=startTime)
+
+    PoIFeature = pl.read_csv(gPoIFeatureSavePath, has_header=True).lazy()
+    PoIFeature = PoIFeature.rename({PoIFeature.collect_schema().names()[0]: 'grid'})
+    PoIFeature = PoIFeature.with_columns(pl.col('grid').cast(pl.Int32))
+    PoIFeature.collect()
+    stay = pl.from_pandas(stay).lazy()
+    stay = stay.join(PoIFeature,
+                        on='grid', how='left').fill_nan(0)
+    stay = stay.collect(type_coercion=True,
+                        projection_pushdown=True)
+    stay = stay.to_pandas()
+
     return stay, move
 
 def GenerateStayMove(ProcessType = 'independent'):
