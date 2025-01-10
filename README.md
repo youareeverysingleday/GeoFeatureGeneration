@@ -72,11 +72,12 @@ This package can not run in jupyter, because package has used "mulitprocessing".
    1. ~~可以修改 transbigdata 的函数。~~
    2. 也可以自己编写函数来生成stay和move。
    3. 解决说明：这个影响不大。
-8. 其中 AttachFeaturetoTrajectory() 的 elif outputType == 'merged': 部分代码非常耗时，需要改进。
+8. ~~其中 AttachFeaturetoTrajectory() 的 elif outputType == 'merged': 部分代码非常耗时，需要改进。~~
    1. 还没有好的方法来提高速度。
    2. merge 中的 sort=True参数对数据进行排序，这可以加快合并的速度。但是将PoI和trajectory合并的时候，trajectory并不是按照grid进行顺序进行排列的；而是按照时间顺序进行排列的。
    3. join 需要合并的两个数据的index是需要合并比对的对象（join用于将两表按照索引列进行合并）；而trajectory不可能将grid作为index。理论上join会比merge快。
    4. concat用户堆叠，不能灵活的按指定列进行合并。
+   5. 使用polars来解决这个问题。特别是解决merge速度慢的问题。
 9.  每个地域的特征是随着用户和时间变化而变化的。比如用户在白天访问一个地域的医院，但是在晚上访问同一个地域的超市。由于时间的变化，同一个地域的特征表现是不一样的。同样的不同的用户也访问同一个不同特征。
    1. 需要通过一个模型来学习不同时间地域的不同特征表现。不同的人不同时间访问同一地域会生成该地域的不同特征。time2vec模型。如果没有明确用户的特制的情况下，用用户的轨迹来描述用户的特征。有明确用户特征的，直接用用户特征来区分用户。参考GETNext论文中的表述。
 10. ~~**对于问题1, 4, 6 需要统一的解决方法。**~~

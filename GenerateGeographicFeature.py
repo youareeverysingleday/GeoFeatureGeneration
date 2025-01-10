@@ -14,7 +14,7 @@ import time
 from geopy.geocoders import Nominatim
 from geopy.geocoders import BaiduV3
 # 将地址向量化。
-from sentence_transformers import SentenceTransformer, util
+# from sentence_transformers import SentenceTransformer, util
 
 
 ## 加载超参数
@@ -413,9 +413,9 @@ def GetPekingUniversityPoIFeature():
     
     # partofPoIFeature = partofPoIFeature.apply(GetAddressByOpensteetmap, geolocator=geolocator, 
     #                                           axis=1)
-
-    partofPoIFeature= partofPoIFeature.apply(GetAddressByApply, geolocator=geolocator, geocoder=geocoder, 
-                                             axis=1)
+    # 不再使用地址的描述作为判断方位的
+    # partofPoIFeature= partofPoIFeature.apply(GetAddressByApply, geolocator=geolocator, geocoder=geocoder, 
+    #                                          axis=1)
     
     partofPoIFeature = partofPoIFeature.apply(GenerateAddressEmbedding, model=model, 
                                               axis=1)
