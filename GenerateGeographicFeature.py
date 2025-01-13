@@ -440,3 +440,5 @@ if __name__ == '__main__':
     CombineMultiPoIFeatures(OthersFeatureFlag=False)
     endTime1 = datetime.datetime.now()
     print("GetPoIFeature completed. {}".format(endTime1 - startTime))
+    
+    # consume 00:01:10.712.
