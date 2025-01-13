@@ -126,9 +126,12 @@ This package can not run in jupyter, because package has used "mulitprocessing".
     2. 重点-<https://zhuanlan.zhihu.com/p/540416289>
     3. <https://github.com/hobbitlab/Foursquare-Location-Matching>
     4. <https://jishu.proginn.com/doc/7780647801f904d12>
-13. 需要使用polars来完全替换pandas。因为polars速度确实快（至少缩短了2个数量级的时间）。
+13. ~~需要使用polars来完全替换pandas。因为polars速度确实快（至少缩短了2个数量级的时间）。~~
     1. 还不能完全替换，因为tranbigdata使用的是pandas。
     2. 但merge操作肯定需要替换的。
+14. ~~生成地址携带的特征。因为单纯的poi特征没有表明方位信息，也就是说在东面的一个商场和西面的一个商场在poi特征上是一样的。但是他们距离用户的真实地址是不一样的。同时地址表明了地理上人文属性，比如国家、省份等。另外顺便也要将经纬度信息放入特征中，因为经纬度从另一个方面表明了相对的距离信息。同时经纬度有它的缺陷，明显的经纬度0-180之间有个突然的转换。所以只能作为特征一种。~~
+    1. 使用stay中心经纬度作为特征。经纬度数值化的表示了方向和距离。
+
 
 ## Function desrciption
 

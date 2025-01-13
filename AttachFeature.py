@@ -893,7 +893,7 @@ def GenerateStayMoveByChunk(chunk):
     PoIFeature.collect()
     stay = pl.from_pandas(stay).lazy()
     stay = stay.join(PoIFeature,
-                        on='grid', how='left').fill_nan(0)
+                     on='grid', how='left').fill_nan(0)
     stay = stay.collect(type_coercion=True,
                         projection_pushdown=True)
     stay = stay.to_pandas()
