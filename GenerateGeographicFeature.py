@@ -223,6 +223,22 @@ def GenerateSinglePekingUniversityPoIFeature(FilePath, fileParameters, GeoParame
         # 此时的index是grid，后面还需要聚合操作的，所以不能忽略。
         gSharedData.dat = pd.concat([gSharedData.dat, df]).fillna(0.0)
 
+def GetLongitudeLatitude(df, GeoParameters):
+    """_summary_
+    在已经生成统计PoI特征之后的PoIFeature数据中，通过grid的行和列生成经纬度。
+    Args:
+        df (pandas.DataFrame): 传入的PoIFeature数据。
+        GeoParameters (_type_): 全局GeoParameters参数。
+
+    Returns:
+        pandas.DataFrame: 返回生成了经纬度的PoIFeature数据。
+    """
+    loncol, latcol = cc.CantorPairingInverseFunction(df.name)
+    longitude, latitude = tbd.grid_to_centre([loncol, latcol], GeoParameters)
+    df['longitude'] = longitude
+    df['latitude'] = latitude
+    return df
+
 ## 生成北京大学提供的PoI特征
 def GetPekingUniversityPoIFeature():
     """_summary_
@@ -276,11 +292,15 @@ def GetPekingUniversityPoIFeature():
     
     # 将这部分PoI特征复制一份并返回。
     partofPoIFeature = gSharedData.dat.copy()
+    partofPoIFeature = partofPoIFeature.apply(GetLongitudeLatitude, 
+                                              GeoParameters=gGeoParameters,
+                                              axis=1)
 
     # print('partofPoIFeature index {} , cols {}'.format(partofPoIFeature.index, partofPoIFeature.columns))
 
     # 保存。
-    gSharedData.dat.to_csv(gPoISocialFeatureSavePath)
+    # gSharedData.dat.to_csv(gPoISocialFeatureSavePath)
+    partofPoIFeature.to_csv(gPoISocialFeatureSavePath)
     
     cc.PrintEndInfo(functionName='GetSocialPoIFeature()', startTime=startTime)
 
@@ -436,7 +456,8 @@ def CombineMultiPoIFeatures(FeaturesFolderPath='./Data/Output/MultipleFeatures/'
 if __name__ == '__main__':
     startTime = datetime.datetime.now()
     GetParameters('./Parameters.json')
-    # print(gfg.gGeoParameters)
+    # print(gGeoParameters)
+
     CombineMultiPoIFeatures(OthersFeatureFlag=False)
     endTime1 = datetime.datetime.now()
     print("GetPoIFeature completed. {}".format(endTime1 - startTime))
