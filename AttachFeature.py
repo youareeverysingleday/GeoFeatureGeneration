@@ -1043,18 +1043,15 @@ if __name__ == '__main__':
     gDeleteOutofBoundTrajectoryFlag = True
     GenerateStayMove(ProcessType='independent')
     endTime50 = datetime.datetime.now()
-    print("AttachFeaturetoTrajectory independent completed. {}".format(endTime50 - endTime4))
+    print("GenerateStayMove independent completed. {}".format(endTime50 - endTime4))
     
     GenerateStayMove(ProcessType='merged')
     endTime51 = datetime.datetime.now()
-    print("AttachFeaturetoTrajectory independent completed. {}".format(endTime51 - endTime50))
+    print("GenerateStayMove merged completed. {}".format(endTime51 - endTime50))
     
-    endTime5 = datetime.datetime.now()
-    print("GenerateStayMove completed. {}".format(endTime5 - endTime51))
-
     GenerateFeatureMatrix(ProcessType='independent')
     endTime6 = datetime.datetime.now()
-    print("GenerateFeatureMatrix completed. {}".format(endTime6 - endTime5))
+    print("GenerateFeatureMatrix completed. {}".format(endTime6 - endTime51))
 
     # print('--ooo- gFeatureThirdDimension {}'.format(gFeatureThirdDimension))
 

@@ -55,6 +55,7 @@ This package can not run in jupyter, because package has used "mulitprocessing".
    1. 在生成stay的时候做判断，分别处理。
    2. **所有要做下采样或者缩小数据规模的操作都需要判断产生的数据为空了，从而导致合并数据失败！**
    3. 现在以下用户在生成数据的过程中所有的数据都被删除了。=132、-137、=118、-120、=160、-049、-178、-123。
+7. GenerateStayMove(ProcessType='merged')  -> GenerateStayMoveByChunk() -> stay = stay.apply(cc.GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1) 这段代码在对多个chunk 并没有执行生成 grid，直接导致后面的代码执行失败。
 
 ## next plan
 
