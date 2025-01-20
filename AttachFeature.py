@@ -4,11 +4,13 @@ import numpy as np
 import transbigdata as tbd
 import os
 # display polars' progress bar.
-os.environ['POLARS_VERBOSE'] = '1'
+# os.environ['POLARS_VERBOSE'] = '1'
 import math
 import multiprocessing
 import json
 import datetime
+
+import csv
 
 import CommonCode as cc
 
@@ -595,7 +597,6 @@ def GenerateInteractionMatrix():
 def np_3d_to_csv(data, 
                  path, 
                  datatype='float'):
-    import csv
     a2d = data.reshape(data.shape[0], -1)
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
@@ -605,7 +606,7 @@ def np_3d_to_csv(data,
 def np_3d_read_csv(path='./Data/Output/StayMatrx/{}.csv',
                    shape=(-1, 128, 3),
                    datatype='float'):
-    import csv
+    
     # 从csv文件读取2D数组
     with open(path, "r") as f:
         reader = csv.reader(f)
@@ -794,7 +795,6 @@ def GenerateSingleUserStayMove(user):
                                 projection_pushdown=True)
             stay = stay.to_pandas()
 
-
         if move.shape[0] == 0:
             move = pd.DataFrame(columns=['userID', 'SLONCOL', 'SLATCOL', 'stime', 'slon', 
                                         'slat', 'etime', 'elon', 'elat', 'ELONCOL', 
@@ -821,56 +821,72 @@ def GenerateSingleUserStayMove(user):
 
 
 def GenerateStayMoveByChunk(chunk):
-    # startTime = PrintStartInfo('GenerateStayMoveByChunk()')
+    # startTime = cc.PrintStartInfo('GenerateStayMoveByChunk()')
     if gDeleteOutofBoundTrajectoryFlag == True:
         chunk = tbd.clean_outofbounds(chunk, gBounds, col=['longitude', 'latitude'])
-    
+
     # user stay and move to decide sentence length .
     # , 'grid'
     stay, move = tbd.traj_stay_move(chunk, 
                                 gGeoParameters,
                                 col=['userID', 'entireTime', 'longitude', 'latitude'],
                                 activitytime=gActivityTime)
-    # print('-----0.2-----{}'.format(stay.columns))
-    # 生成grid。
-    stay = stay.apply(cc.GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
-    move = move.apply(cc.GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
-    # 需要生成时间特征。
-    stay = stay.apply(GenerateTimeFeature, col='etime', axis=1)
-    move = move.apply(GenerateTimeFeature, col='etime', axis=1)
-
-    # 读取所有特征。
-    # tbd.traj_stay_move() drop other feature. so must merge PoI feature again.
+    
     # PoIFeature = pd.read_csv(gPoIFeatureSavePath, index_col=0)
     # PoIFeature['grid'] = PoIFeature.index
-
-    # 将通过PoI获得的特征以及其他特征和停留点特征合并。
-    # mmm
-    # stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
-    # move contain feature of start place and feature of end place.
-    # so, feature of move need special process.
-    # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
-
-    # PrintEndInfo('GenerateStayMoveByChunk()', startTime=startTime)
 
     PoIFeature = pl.read_csv(gPoIFeatureSavePath, has_header=True).lazy()
     PoIFeature = PoIFeature.rename({PoIFeature.collect_schema().names()[0]: 'grid'})
     PoIFeature = PoIFeature.with_columns(pl.col('grid').cast(pl.Int32))
     PoIFeature.collect()
-    stay = pl.from_pandas(stay).lazy()
-    stay = stay.join(PoIFeature,
-                     on='grid', how='left').fill_nan(0)
-    stay = stay.collect(type_coercion=True,
-                        projection_pushdown=True)
-    stay = stay.to_pandas()
+    
+    # function will return an empty dataframe, when stay, move is empty.
+    if stay.shape[0] != 0:
+        # # 生成grid。
+        stay = stay.apply(cc.GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1)
+        # 需要生成时间特征。
+        stay = stay.apply(GenerateTimeFeature, col='etime', axis=1)
+        # # tbd.traj_stay_move() drop other feature. so must merge PoI feature again.
+        # # 将通过PoI获得的特征以及其他特征和停留点特征合并。
+        # stay = stay.merge(PoIFeature, on='grid', how='left').fillna(0)
 
+        stay = pl.from_pandas(stay).lazy()
+        stay = stay.with_columns(pl.col('grid').cast(pl.Int32))
+        # print(stay.columns, PoIFeature.columns)
+        stay = stay.join(PoIFeature,
+                         on='grid', how='left').fill_nan(0)
+        stay = stay.collect(type_coercion=True,
+                            projection_pushdown=True)
+        stay = stay.to_pandas()
+    else:
+        stay = pd.DataFrame()
+
+    if move.shape[0] != 0:
+        move = move.apply(cc.GenerateGrid, lonColName='SLONCOL', latColName='SLATCOL', axis=1)
+        move = move.apply(GenerateTimeFeature, col='etime', axis=1)
+        # move contain feature of start place and feature of end place.
+        # so, feature of move need special process.
+        # move = move.merge(PoIFeature, on='grid', how='left').fillna(0)
+
+        move = pl.from_pandas(move).lazy()
+        move = move.with_columns(pl.col('grid').cast(pl.Int32))
+        # print(stay.columns, PoIFeature.columns)
+        move = move.join(PoIFeature,
+                         on='grid', how='left').fill_nan(0)
+        move = move.collect(type_coercion=True,
+                            projection_pushdown=True)
+        move = move.to_pandas()
+    else:
+        move = pd.DataFrame()
+
+    # cc.PrintEndInfo('GenerateStayMoveByChunk()', startTime=startTime)
     return stay, move
 
 def GenerateStayMove(ProcessType = 'independent'):
     """_summary_
     生成特征矩阵。
     """
-    startTime = cc.PrintStartInfo('GenerateStayMove()')
+    startTime = cc.PrintStartInfo('GenerateStayMove()', description=ProcessType)
     # 对每个用户单独进行处理。
     if ProcessType == 'independent':
         userList = gUserList
@@ -899,9 +915,10 @@ def GenerateStayMove(ProcessType = 'independent'):
         #                             col=['userID', 'entireTime', 'longitude', 'latitude', 'grid'],
         #                             activitytime=gActivityTime)
 
-        chunksize = 100000
+        chunksize = 100
         chunks = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
                     index_col=0, parse_dates=['entireTime'],
+                    date_format='%Y-%m-%d %H:%M:%S',
                     chunksize=chunksize)
         ProcessPool = multiprocessing.Pool()
         results = ProcessPool.map(GenerateStayMoveByChunk, chunks)
@@ -976,12 +993,20 @@ def GenerateFeatureMatrix(ProcessType = 'independent'):
         pass
     cc.PrintEndInfo('GenerateFeatureMatrix()', startTime=startTime)
 
-def CombineUsersMatrix():
+def CombineUsersMatrix(FeatureThirdDimension=28):
+    """_summary_
+    将多个用户的轨迹矩阵合并为一个整体的轨迹矩阵，用于transformer的训练。
+    Args:
+        FeatureThirdDimension (int, optional): 千万注意，当前面的特征变化之后，这个值也是需要随之变化的. Defaults to 28.
+
+    Returns:
+        _type_: _description_
+    """
 
     # stay = pd.read_csv(gSingleUserStaySavePath.format(gUserList[0]), index_col=0)
     # FeatureThirdDimension = stay.shape[1] - len(dropColunms)
     # 18 gFeatureThirdDimension
-    FeatureThirdDimension = 26
+
     # print('FeatureThirdDimension {}, gFeatureThirdDimension {}'.format(FeatureThirdDimension, gFeatureThirdDimension))
     FeatureShape = (-1, gMaxRow, FeatureThirdDimension)
     # print('CombineUsersMatrix start. FeatureShape is {}'.format(FeatureShape))
@@ -989,14 +1014,17 @@ def CombineUsersMatrix():
     AllUsersTrajectoriesFeature = np.empty((0, gMaxRow, FeatureThirdDimension))
 
     for user in gUserList:
-        # 如果所有用户中有些用户的轨迹并没有生成，就需要跳过。
-        if os.path.exists(gSingleUserStayMatrixSavePath.format(user)) == False:
-            continue
+        try:
+            # 如果所有用户中有些用户的轨迹并没有生成，就需要跳过。
+            if os.path.exists(gSingleUserStayMatrixSavePath.format(user)) == False:
+                continue
 
-        userFeature = np_3d_read_csv(gSingleUserStayMatrixSavePath.format(user), shape=FeatureShape)
-        # print(userFeature.shape)
-        # print(AllUsersTrajectoriesFeature.shape)
-        AllUsersTrajectoriesFeature = np.concatenate((AllUsersTrajectoriesFeature, userFeature), axis=0)
+            userFeature = np_3d_read_csv(gSingleUserStayMatrixSavePath.format(user), shape=FeatureShape)
+            # print(userFeature.shape)
+            # print(AllUsersTrajectoriesFeature.shape)
+            AllUsersTrajectoriesFeature = np.concatenate((AllUsersTrajectoriesFeature, userFeature), axis=0)
+        except:
+            print('Error {}.'.format(user))
 
     np_3d_to_csv(AllUsersTrajectoriesFeature, gAllUsersTrajectoriesFeatureMatrixSavePath)
     
@@ -1007,7 +1035,7 @@ if __name__ == '__main__':
     GetParameters('./Parameters.json')
     startTime = datetime.datetime.now()
 
-    # consume 18:49 . 
+    # consume 0:25:15.510780. 
     if gRefreshDataFlag == True:
         gSaveUserTrajectoryFlag = True
         PreprocessTrajectory(userRange='all', outputType='merged')
@@ -1017,7 +1045,7 @@ if __name__ == '__main__':
         endTime2 = datetime.datetime.now()
         print("PreprocessTrajectory don't processing. {}".format(endTime2 - startTime))
 
-    # consume 5:36:00 .
+    # consume 0:00:22.425468 .
     # 两种模式都需要处理一次，主要时候后面最终输出为不同的格式时需要不同的数据形状。
     # 生成交互矩阵需要使用所有用户在一个dataframe的形式。
     # 在生成轨迹特征的时候，单独处理一个dataframe效率太低，建议使用分别处理每个用户的形式。
@@ -1025,26 +1053,28 @@ if __name__ == '__main__':
     endTime30 = datetime.datetime.now()
     print("AttachFeaturetoTrajectory independent completed. {}".format(endTime30 - endTime2))
     
-    # consume 00:24:43.88 .
+    # consume 0:00:35.126483 .
     AttachFeaturetoTrajectory(outputType='merged')
     endTime31 = datetime.datetime.now()
     print("AttachFeaturetoTrajectory merged completed. {}".format(endTime31 - endTime2))
 
-    # consume 00:1:26 .
-    # 需要将区域外的地点都排除。
+    # # consume 0:00:24.995880 .
+    # # 需要将区域外的地点都排除。
     gDeleteOutofBoundTrajectoryFlag = True
     GenerateInteractionMatrix()
     endTime4 = datetime.datetime.now()
     print("GenerateInteractionMatrix completed. {}".format(endTime4 - endTime31))
 
-    # consume 2:24:26 .
+    # consume time: 0:38:29.876277 .
     # 建议使用对每个用户分别处理的形式。最后再进行合并效率比较高。
     # test gfg.gUserList = ['079', '047']
     gDeleteOutofBoundTrajectoryFlag = True
     GenerateStayMove(ProcessType='independent')
     endTime50 = datetime.datetime.now()
-    print("GenerateStayMove independent completed. {}".format(endTime50 - endTime4))
+    # endTime4
+    print("GenerateStayMove independent completed. {}".format(endTime50 - startTime))
     
+    # consume time: 0:59:01.930863
     GenerateStayMove(ProcessType='merged')
     endTime51 = datetime.datetime.now()
     print("GenerateStayMove merged completed. {}".format(endTime51 - endTime50))
@@ -1053,10 +1083,8 @@ if __name__ == '__main__':
     endTime6 = datetime.datetime.now()
     print("GenerateFeatureMatrix completed. {}".format(endTime6 - endTime51))
 
-    # print('--ooo- gFeatureThirdDimension {}'.format(gFeatureThirdDimension))
-
-    CombineUsersMatrix()
+    CombineUsersMatrix(FeatureThirdDimension=28)
     endTime7 = datetime.datetime.now()
-    print("CombineUsersMatrix completed. {}".format(endTime7 - endTime6))
+    print("CombineUsersMatrix completed. {}".format(endTime7 - startTime))
 
     print("All completed. {}".format(endTime7 - startTime))

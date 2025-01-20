@@ -55,7 +55,9 @@ This package can not run in jupyter, because package has used "mulitprocessing".
    1. 在生成stay的时候做判断，分别处理。
    2. **所有要做下采样或者缩小数据规模的操作都需要判断产生的数据为空了，从而导致合并数据失败！**
    3. 现在以下用户在生成数据的过程中所有的数据都被删除了。=132、-137、=118、-120、=160、-049、-178、-123。
-7. GenerateStayMove(ProcessType='merged')  -> GenerateStayMoveByChunk() -> stay = stay.apply(cc.GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1) 这段代码在对多个chunk 并没有执行生成 grid，直接导致后面的代码执行失败。
+7. ~~GenerateStayMove(ProcessType='merged')  -> GenerateStayMoveByChunk() -> stay = stay.apply(cc.GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1) 这段代码在对多个chunk 并没有执行生成 grid，直接导致后面的代码执行失败。~~
+   1. 由于在生成stay的时候，有些轨迹并没有停留超过1800秒的点，所以导致生成的stay为空。直接导致stay.apply()报错。
+8. 在132、137、118、120、160、123这个几个用户在 SeriesToMatrix 函数中生成的matrix的长度与其他的用户生成的长度不一样，好像没有经过数值化处理一样。132、137、118、120、160、123的长度为2944，而其他用户的矩阵长度是3584。
 
 ## next plan
 
