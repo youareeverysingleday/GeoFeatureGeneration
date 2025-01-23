@@ -1,7 +1,9 @@
 import os
 import math
 import datetime
+import time
 import polars as pl
+import logging
 
 ## 小工具
 
@@ -17,19 +19,23 @@ def AddStringIncolumn(df, columnName, content):
 
 def PrintStartInfo(functionName, description=''):
     startTime = datetime.datetime.now()
-    print('Start function: {} ,pid: {} ,start at: {} .'.
-          format(functionName, os.getpid(), startTime.strftime('%Y-%m-%d %H:%M:%S')))
-    if description != '':
-        print(description)
+    logging.INFO("Start {} {} pid:{} ,start at:{}".format(functionName, description, os.getpid(), startTime.strftime('%Y-%m-%d %H:%M:%S')))
     return startTime
 
 def PrintEndInfo(functionName, startTime, description=''):
-    print('End function: {} ,pid: {} ,completed time: {} ,\n  \
-          consume time: {} .'.format(functionName, os.getpid(),
+    logging.INFO("End {} {} pid:{} ,completed at:{}, consume time: {}".format(functionName, description, os.getpid(),
                                      datetime.datetime.now(), 
-                                     datetime.datetime.now() - startTime))
-    if description != '':
-        print(description)
+                                     datetime.datetime.now() - startTime))))
+
+def PrintStartDebug(functionName, description=''):
+    startTime = datetime.datetime.now()
+    logging.DEBUG("Start {} {} pid:{} ,start at:{}".format(functionName, description, os.getpid(), startTime.strftime('%Y-%m-%d %H:%M:%S')))
+    return startTime
+
+def PrintEndDebug(functionName, startTime, description=''):
+    logging.DEBUG("End {} {} pid:{} ,completed at:{}, consume time: {}".format(functionName, description, os.getpid(),
+                                     datetime.datetime.now(), 
+                                     datetime.datetime.now() - startTime))))
 
 def CantorPairingFunction(x, y):
     """_summary_
@@ -191,3 +197,20 @@ def RecoverLoncolLatcolInPolars(df):
     )
     df = df.unnest("new_columns")
     return df
+
+
+def MeasureTime(task_name, func, *args, **kwargs):
+    """_summary_
+    用于计算任务运行的时间。
+    Args:
+        task_name (_type_): _description_
+        func (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    start_time = time.time()
+    result = func(*args, **kwargs)
+    elapsed_time = time.time() - start_time
+    logging.INFO(f"{task_name} consume time: {elapsed_time:.2f} s.")
+    return result

@@ -641,64 +641,68 @@ def SeriesToMatrix(user, data, interval='M', maxrow=128,
     """
     
     stay = data.copy()
-    # print('3 stay shape {}'.format(stay.shape))
-    # print(stay.head(2))
-    # print(stay.columns)
-
-    # 获得时间戳。
-    stay['stimestamp'] = stay['stime'].astype('int64') // 1e9
-    # stay.head()
-    # print('3.1 stay shape {}'.format(stay.shape))
-
-    stayGroup = stay.groupby(pd.Grouper(key='stime', freq=interval))
-
-    FeatureThirdDimension = stay.shape[1] - len(dropColunms)
-    # 创建一个空的result矩阵。
-    result = np.empty((0, maxrow, FeatureThirdDimension))
-
-    # print((0, maxrow, FeatureThirdDimension))
-    
-    for g in stayGroup:
-        # 取月份值。
-        key = g[0].month
-        # print(type(key))
-        
-        # 取所有特征量。
-        # 之所以需要copy一次是因为
-        df = g[1].copy()
-        # delete unneccessary columns.
-        df.drop(dropColunms, axis=1, inplace=True)
-        # 删除全为零的行。
-        df  = drop_all_0_rows(df)
-
-        value = df.values
-        # 因为需要由2维矩阵变为3维矩阵，所有需要变为numpy.narray类型。
-        # value = f2.values
-        
-        # 之前再f1的时候已经处理了。这里就不再继续处理了。
-        # 删除全为NaN的行。
-        # value.dropna(axis=0, how='all', inplace=True)
-
-        # 如果行数为0，也就是说没有轨迹点。那么就跳过。
-        if value.shape[0] == 0:
-            continue
-        # 将轨迹填充为相同的形状。
-        # 对于大于设置超参数的行数（2维时的行数），也就是interval下的最多stay数量，处理方式需要另外实现。
-        if value.shape[0] > maxrow:
-            continue
-        else:
-            # 将不足interval下最多stay数量的矩阵填充为maxrow（2维时的行数）的数值。
-            value = np.pad(array=value, pad_width=((0,maxrow-value.shape[0]),(0,0)), mode='constant')
-
-        # 将单个用户的所有interval下的轨迹组合起来。合并之后的结果是一个三维矩阵。
-        result = np.concatenate((result, value[np.newaxis,:]), axis=0)
-    
-    # print(result.shape)
-
-    if result.shape[0] == 0:
-        # 178 user trajectory is 0.
-        print('------{} shape is zero.'.format(user))
+    # if user stay martix is empty, it will reture Empty DataFrame.
+    # and don't save result.
+    if stay.shape[0] == 0:
+        print('------{} stay shape is zero.'.format(user))
+        result = pd.DataFrame()
+        FeatureThirdDimension = stay.shape[1] - len(dropColunms)
     else:
+        pass
+        # print('3 stay shape {}'.format(stay.shape))
+        # print(stay.head(2))
+        # print(stay.columns)
+
+        # 获得时间戳。
+        stay['stimestamp'] = stay['stime'].astype('int64') // 1e9
+        # stay.head()
+        # print('3.1 stay shape {}'.format(stay.shape))
+
+        stayGroup = stay.groupby(pd.Grouper(key='stime', freq=interval))
+
+        FeatureThirdDimension = stay.shape[1] - len(dropColunms)
+        # 创建一个空的result矩阵。
+        result = np.empty((0, maxrow, FeatureThirdDimension))
+
+        # print((0, maxrow, FeatureThirdDimension))
+        
+        for g in stayGroup:
+            # 取月份值。
+            key = g[0].month
+            # print(type(key))
+            
+            # 取所有特征量。
+            # 之所以需要copy一次是因为
+            df = g[1].copy()
+            # delete unneccessary columns.
+            df.drop(dropColunms, axis=1, inplace=True)
+            # 删除全为零的行。
+            df  = drop_all_0_rows(df)
+
+            value = df.values
+            # 因为需要由2维矩阵变为3维矩阵，所有需要变为numpy.narray类型。
+            # value = f2.values
+            
+            # 之前再f1的时候已经处理了。这里就不再继续处理了。
+            # 删除全为NaN的行。
+            # value.dropna(axis=0, how='all', inplace=True)
+
+            # 如果行数为0，也就是说没有轨迹点。那么就跳过。
+            if value.shape[0] == 0:
+                continue
+            # 将轨迹填充为相同的形状。
+            # 对于大于设置超参数的行数（2维时的行数），也就是interval下的最多stay数量，处理方式需要另外实现。
+            if value.shape[0] > maxrow:
+                continue
+            else:
+                # 将不足interval下最多stay数量的矩阵填充为maxrow（2维时的行数）的数值。
+                value = np.pad(array=value, pad_width=((0,maxrow-value.shape[0]),(0,0)), mode='constant')
+
+            # 将单个用户的所有interval下的轨迹组合起来。合并之后的结果是一个三维矩阵。
+            result = np.concatenate((result, value[np.newaxis,:]), axis=0)
+        
+        # print(result.shape)
+
         # 保存。
         np_3d_to_csv(result, gSingleUserStayMatrixSavePath.format(user))
 
@@ -729,6 +733,9 @@ def GenerateSingleUserStayMove(user):
     Args:
         user (_type_): _description_
     """
+
+    startTime = cc.PrintStartDebug(functionName='GenerateSingleUserStayMove', 
+                                  description='Start')
     # 读取轨迹。
     userTrajectory = pd.read_csv(gSingleUserTrajectoryFeaturePath.format(user), 
                                  index_col=0,
@@ -817,7 +824,9 @@ def GenerateSingleUserStayMove(user):
     stay.to_csv(gSingleUserStaySavePath.format(user))
     move.to_csv(gSingleUserMoveSavePath.format(user))
 
-    # print('{} feature has completed.'.format(user))
+    cc.PrintEndDebug(functionName='GenerateSingleUserStayMove', 
+                    startTime=startTime, 
+                    description='End')
 
 
 def GenerateStayMoveByChunk(chunk):
@@ -889,12 +898,14 @@ def GenerateStayMove(ProcessType = 'independent'):
     startTime = cc.PrintStartInfo('GenerateStayMove()', description=ProcessType)
     # 对每个用户单独进行处理。
     if ProcessType == 'independent':
+        logging.DEBUG("start GenerateStayMove independent.")
         userList = gUserList
         ProcessPool = multiprocessing.Pool()
         ProcessPool.map(GenerateSingleUserStayMove, userList)
 
         ProcessPool.close()
         ProcessPool.join()
+        logging.DEBUG("end GenerateStayMove independent.")
     # 处理所有用户整个处于一个csv中。效率比较低。推荐使用independent模式。
     elif ProcessType == 'merged':
         # Trajectories = pd.read_csv(gAllUsersTrajectoryFeaturePath, 
@@ -1032,6 +1043,14 @@ def CombineUsersMatrix(FeatureThirdDimension=28):
     return AllUsersTrajectoriesFeature 
 
 if __name__ == '__main__':
+    # 配置日志文件。
+    log_dir = './logs'
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'AF.log')
+    logging.basicConfig(filename=log_file, 
+                        level=logging.DEBUG, 
+                        format='%(asctime)s -%(levelname)s - %(message)s')
+    
     GetParameters('./Parameters.json')
     startTime = datetime.datetime.now()
 
@@ -1072,19 +1091,21 @@ if __name__ == '__main__':
     GenerateStayMove(ProcessType='independent')
     endTime50 = datetime.datetime.now()
     # endTime4
-    print("GenerateStayMove independent completed. {}".format(endTime50 - startTime))
+    print("GenerateStayMove independent completed. {}".format(endTime50 - endTime4))
     
     # consume time: 0:59:01.930863
     GenerateStayMove(ProcessType='merged')
     endTime51 = datetime.datetime.now()
     print("GenerateStayMove merged completed. {}".format(endTime51 - endTime50))
     
+    # consume time: 0:00:03.740401.
     GenerateFeatureMatrix(ProcessType='independent')
     endTime6 = datetime.datetime.now()
     print("GenerateFeatureMatrix completed. {}".format(endTime6 - endTime51))
 
+    # consume time: 0:00:07.420286.
     CombineUsersMatrix(FeatureThirdDimension=28)
     endTime7 = datetime.datetime.now()
-    print("CombineUsersMatrix completed. {}".format(endTime7 - startTime))
+    print("CombineUsersMatrix completed. {}".format(endTime7 - endTime6))
 
     print("All completed. {}".format(endTime7 - startTime))

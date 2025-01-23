@@ -57,7 +57,11 @@ This package can not run in jupyter, because package has used "mulitprocessing".
    3. 现在以下用户在生成数据的过程中所有的数据都被删除了。=132、-137、=118、-120、=160、-049、-178、-123。
 7. ~~GenerateStayMove(ProcessType='merged')  -> GenerateStayMoveByChunk() -> stay = stay.apply(cc.GenerateGrid, lonColName='LONCOL', latColName='LATCOL', axis=1) 这段代码在对多个chunk 并没有执行生成 grid，直接导致后面的代码执行失败。~~
    1. 由于在生成stay的时候，有些轨迹并没有停留超过1800秒的点，所以导致生成的stay为空。直接导致stay.apply()报错。
-8. 在132、137、118、120、160、123这个几个用户在 SeriesToMatrix 函数中生成的matrix的长度与其他的用户生成的长度不一样，好像没有经过数值化处理一样。132、137、118、120、160、123的长度为2944，而其他用户的矩阵长度是3584。
+8. ~~在132、137、118、120、160、123这个几个用户在 SeriesToMatrix 函数中生成的matrix的长度与其他的用户生成的长度不一样，好像没有经过数值化处理一样。132、137、118、120、160、123的长度为2944，而其他用户的矩阵长度是3584。~~
+   1. 已经解决：是由于在 SeriesToMatrix() 函数中读取的stay数据为空导致的。原因是 GenerateSingleUserStayMove() 函数在 tbd.clean_outofbounds() 和 tbd.traj_stay_move() 会使得生成的stay的数据减少。所以导致 SeriesToMatrix() 读取的数据只有列名，没有数值数据。因此导致报错。
+9. 在完整流程中，也就是执行完GenerateInteractionMatrix()之后再执行GenerateStayMove(ProcessType='independent')时， GenerateStayMove(ProcessType='independent') 处理第一个132号user的数据之后会停留非常长的时间。按道理应该是多任务并发处理多个用户的数据。此时CPU也是空闲的状态，内存也空余很大。但是当主程序从 GenerateStayMove(ProcessType='independent') 开始执行时，就会非常快的进入并发对多个user数据进行处理的操作。不清楚原因。
+   1. 有以下几个建议，但并不能直接解决问题：
+      
 
 ## next plan
 
@@ -134,7 +138,70 @@ This package can not run in jupyter, because package has used "mulitprocessing".
     2. 但merge操作肯定需要替换的。
 14. ~~生成地址携带的特征。因为单纯的poi特征没有表明方位信息，也就是说在东面的一个商场和西面的一个商场在poi特征上是一样的。但是他们距离用户的真实地址是不一样的。同时地址表明了地理上人文属性，比如国家、省份等。另外顺便也要将经纬度信息放入特征中，因为经纬度从另一个方面表明了相对的距离信息。同时经纬度有它的缺陷，明显的经纬度0-180之间有个突然的转换。所以只能作为特征一种。~~
     1. 使用stay中心经纬度作为特征。经纬度数值化的表示了方向和距离。
+15. 代码改进建议：
+   1. 使用logging来进行日志处理。示例代码如下：
+      ```python
+      import pandas as pd
+      import geopandas as gpd
+      import os
+      import logging
 
+      # 配置日志
+      logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+      def load_data(file_path: str) -> pd.DataFrame:
+         """
+         加载数据
+         """
+         logging.info(f"正在加载数据：{file_path}")
+         try:
+            data = pd.read_csv(file_path)
+            return data
+         except Exception as e:
+            logging.error(f"数据加载失败：{e}")
+            raise
+
+      def preprocess_data(data: pd.DataFrame) -> pd.DataFrame:
+         """
+         数据预处理
+         """
+         logging.info("开始数据预处理")
+         # 示例：填充缺失值
+         data = data.fillna(0)
+         return data
+
+      def generate_features(data: pd.DataFrame) -> pd.DataFrame:
+         """
+         特征生成
+         """
+         logging.info("开始生成特征")
+         # 示例：创建一个新特征
+         data['new_feature'] = data['some_column'] * 2
+         return data
+
+      def main():
+         # 主流程
+         file_path = "input.csv"
+         output_path = "output.csv"
+
+         data = load_data(file_path)
+         data = preprocess_data(data)
+         data = generate_features(data)
+         data.to_csv(output_path, index=False)
+         logging.info(f"处理完成，结果已保存到：{output_path}")
+
+      if __name__ == "__main__":
+         main()
+      ```
+   2. 使用gc来释放内存。
+      ```python
+      # 确保在转换时释放内存
+      import gc
+
+      polars_df = polars.from_pandas(pandas_df)
+      del pandas_df
+      gc.collect()
+      ```
 
 ## Function desrciption
 
