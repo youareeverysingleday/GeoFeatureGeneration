@@ -6,4 +6,6 @@ Data/Output/TrajectoryFeature/
 Data/Output/Move/
 Data/Output/Stay/
 Data/Output/ProcessedTrajectories/
+Data/Output/Trajectory_all.csv
+Data/Output/usersTrajectory.csv
 Temp/
