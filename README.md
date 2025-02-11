@@ -202,6 +202,7 @@ This package can not run in jupyter, because package has used "mulitprocessing".
       del pandas_df
       gc.collect()
       ```
+16. 完成foursquare的数据预处理。
 
 ## Function desrciption
 
