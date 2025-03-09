@@ -10,7 +10,7 @@ This package can not run in jupyter, because package has used "mulitprocessing".
 
 | number | city           | Regional scope               | description                       |
 | ------ | -------------- | ---------------------------- | --------------------------------- |
-| 1      | 北京经纬度范围 | 115.7, 39.4, 117.4, 41.6     | 北京目前之后北京大学提供的PoI数据 |
+| 1      | 北京经纬度范围 | 115.7, 39.4, 117.4, 41.6     | 北京目前由北京大学提供的PoI数据 |
 | 2      | 武汉经纬度范围 | 113.68, 29.97, 115.08, 31.37 | ......                            |
 
 ## publish information
@@ -61,6 +61,17 @@ This package can not run in jupyter, because package has used "mulitprocessing".
    1. 已经解决：是由于在 SeriesToMatrix() 函数中读取的stay数据为空导致的。原因是 GenerateSingleUserStayMove() 函数在 tbd.clean_outofbounds() 和 tbd.traj_stay_move() 会使得生成的stay的数据减少。所以导致 SeriesToMatrix() 读取的数据只有列名，没有数值数据。因此导致报错。
 9. 在完整流程中，也就是执行完GenerateInteractionMatrix()之后再执行GenerateStayMove(ProcessType='independent')时， GenerateStayMove(ProcessType='independent') 处理第一个132号user的数据之后会停留非常长的时间。按道理应该是多任务并发处理多个用户的数据。此时CPU也是空闲的状态，内存也空余很大。但是当主程序从 GenerateStayMove(ProcessType='independent') 开始执行时，就会非常快的进入并发对多个user数据进行处理的操作。不清楚原因。
    1. 有以下几个建议，但并不能直接解决问题：
+10. 需要增加的特征：
+   1. 距离上一个点的距离。
+   2. 距离上一个点的时间。
+   3. 上一个点来到当前点的速度。
+   4. 需要生成的特征中可以包含：来的方向和去的方向。
+      1. 需要注意的是：来的方向是已知量，但去的方向是未知量。
+         1. 最后一个停留点的去的方向是空值。
+      2. 去的方向可以用作为标签来进行预测。预测之后再进行下一个停留点的预测。预测的方向可以作为缩小样本的限制条件。
+      3. **定义一个函数来从stay中生成方向数据。**
+         1. **注意需要判断id是否是同一个人的停留点。**
+         2. **在算法中需要生成依据方向样本生成函数，或者按照方向对样本的惩罚系数！！！**
       
 
 ## next plan
