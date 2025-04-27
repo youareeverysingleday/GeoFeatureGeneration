@@ -4,6 +4,7 @@ import datetime
 import time
 import polars as pl
 import logging
+import json
 
 ## 小工具
 
@@ -25,7 +26,7 @@ def PrintStartInfo(functionName, description=''):
 def PrintEndInfo(functionName, startTime, description=''):
     logging.INFO("End {} {} pid:{} ,completed at:{}, consume time: {}".format(functionName, description, os.getpid(),
                                      datetime.datetime.now(), 
-                                     datetime.datetime.now() - startTime))))
+                                     datetime.datetime.now() - startTime))
 
 def PrintStartDebug(functionName, description=''):
     startTime = datetime.datetime.now()
@@ -35,7 +36,7 @@ def PrintStartDebug(functionName, description=''):
 def PrintEndDebug(functionName, startTime, description=''):
     logging.DEBUG("End {} {} pid:{} ,completed at:{}, consume time: {}".format(functionName, description, os.getpid(),
                                      datetime.datetime.now(), 
-                                     datetime.datetime.now() - startTime))))
+                                     datetime.datetime.now() - startTime))
 
 def CantorPairingFunction(x, y):
     """_summary_
@@ -214,3 +215,40 @@ def MeasureTime(task_name, func, *args, **kwargs):
     elapsed_time = time.time() - start_time
     logging.INFO(f"{task_name} consume time: {elapsed_time:.2f} s.")
     return result
+
+
+class JSONConfig:
+    """_summary_
+    对在parameters.json中存储的全局变量进行操作。
+    """
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.data = self._load_json()
+
+    def _load_json(self):
+        """加载 JSON 文件"""
+        try:
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def save(self):
+        """保存数据到 JSON 文件"""
+        with open(self.file_path, 'w', encoding='utf-8') as f:
+            json.dump(self.data, f, indent=4, ensure_ascii=False)
+
+    def get(self, key, default=None):
+        """获取 JSON 变量"""
+        return self.data.get(key, default)
+
+    def set(self, key, value):
+        """设置 JSON 变量并保存"""
+        self.data[key] = value
+        self.save()
+
+    def delete(self, key):
+        """删除 JSON 变量并保存"""
+        if key in self.data:
+            del self.data[key]
+            self.save()

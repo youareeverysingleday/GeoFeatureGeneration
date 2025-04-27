@@ -1,5 +1,6 @@
 {
     "gBounds": [115.4, 39.4, 117.55, 41.1],
+    "gBoundsWuhan": [113.68, 29.97, 115.08, 31.37],
     "accuracy": 1000,
     "method": "rect",
     "gMaxRow": 128,
