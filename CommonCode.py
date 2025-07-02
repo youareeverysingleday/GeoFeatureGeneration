@@ -3,8 +3,10 @@ import math
 import datetime
 import time
 import polars as pl
+import pandas as pd
 import logging
 import json
+import transbigdata as tbd
 
 ## 小工具
 
@@ -289,3 +291,46 @@ class JSONConfig:
         if key in self.data:
             del self.data[key]
             self.save()
+            
+def GenerateAllGridMapping(Bounds, 
+                           mappingColumnName = 'grid_mapping',
+                           mappingSavePath='./Data/Output/all_grid_mapping.csv'):
+    """_summary_
+    按照地图信息将所有区域grid映射到一个合理范围。
+    Args:
+        Bounds (_type_): transbigdata 所需的区域范围参数。
+        mappingColumnName (str, optional): 映射生成列的列名. Defaults to 'grid_mapping'.
+        mappingSavePath (str, optional): 映射保存路径. Defaults to './Data/Output/all_grid_mapping.csv'.
+
+    Returns:
+        _type_: _description_
+    """
+    GeoParameters = tbd.area_to_params(Bounds, accuracy = 1000, method='rect')
+    n_lon = int((Bounds[2] - Bounds[0]) / GeoParameters['deltalon'])
+    n_lat = int((Bounds[3] - Bounds[1]) / GeoParameters['deltalat'])
+
+    # 获取所有栅格编号 [LONCOL, LATCOL]
+    loncols = list(range(n_lon))
+    latcols = list(range(n_lat))
+    # 生成所有loncol , latcol。
+    all_grid_df = pd.DataFrame([[lon, lat] for lon in loncols for lat in latcols], columns=['loncol', 'latcol'])
+    # 生成grid。
+    all_grid_df = all_grid_df.apply(GenerateGrid , lonColName='loncol', latColName='latcol', axis=1)
+
+    GridColumnData = pd.DataFrame(all_grid_df.loc[:, 'grid'])
+    # 生成列名。这一步不能删除，没有添加列名，就是一个series，后面就无法重新排序了。
+    GridColumnData.columns = ['grid']
+    # 去重之后共计9396个区域，数量没有变化。
+    Grid_duplicated = GridColumnData.drop_duplicates()
+    # 重新排序。查看前10个样本，感觉实际也没有做任何操作。可能已经排过序了。
+    Grid_duplicated = Grid_duplicated.sort_values(by='grid', ascending=True)
+    # 重置Index。
+    Grid_duplicated = Grid_duplicated.reset_index(drop=True)
+    # 将index 定义为新的映射列名。
+    Grid_duplicated[mappingColumnName] = Grid_duplicated.index
+    # 将映射全部加1，因为需要将0作为异常值赋值给未知区域对应的映射。
+    # 将0作为异常值赋值给未知区域对应的映射的这个步骤在ReadDataTransformtoTensor()函数中完成。
+    Grid_duplicated[mappingColumnName] += 1
+    # 保留对应关系。将所有去重之后的已有停留点的包含grid的dataframe保留下来。
+    Grid_duplicated.to_csv(mappingSavePath)
+    return Grid_duplicated
