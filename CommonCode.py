@@ -334,3 +334,4 @@ def GenerateAllGridMapping(Bounds,
     # 保留对应关系。将所有去重之后的已有停留点的包含grid的dataframe保留下来。
     Grid_duplicated.to_csv(mappingSavePath)
     return Grid_duplicated
+

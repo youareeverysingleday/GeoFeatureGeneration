@@ -250,6 +250,7 @@ This package can concat multi vectorized features to one matrix.
 2. interaction matrxi. completed.
 3. similar netural language matrix. completed.
 4. graph structure. to be implemented.
+5. Negative sample structure applied to contrastive learning.
 
 | num | format             | describe                                                         |
 | --- | ------------------ | ---------------------------------------------------------------- |
@@ -257,6 +258,44 @@ This package can concat multi vectorized features to one matrix.
 | 2   | language matrix    | mainly used for deep learning.                                   |
 | 3   | time series        | mainly used for LSTM or others.                                  |
 | 4   |                    |                                                                  |
+| 5   |contrastive learning | used to improve accuracy@topk.                                  |
+
+对比学习格式说明和示例：
+```json
+{
+  'query': {
+      'region': [...],     # regionID 序列
+      'timestamp': [...],  # 时间戳序列
+      'features': [...],   # 每个位置的其他特征
+  },
+  'pos': {
+      'region': regionID_{t+1},
+      'timestamp': ts_{t+1},
+      'features': [...]
+  },
+  'neg': [
+      {'region': r₁, 'timestamp': ts₁, 'features': [...]},
+      {'region': r₂, 'timestamp': ts₂, 'features': [...]},
+      ...
+  ]
+}
+```
+
+```json
+{
+  'query': [
+    (2356, '2025-05-25 19:25:36', [0.5, 1.2]), 
+    (1278, '2025-05-26 08:25:36', [2.1, 3.2])
+  ],
+  'pos': (1278, '2025-05-26 14:06:36', [1.7, 2.2]),
+  'neg': [
+    {'region': 3112, 'timestamp': None, 'features': None},
+    {'region': 1901, 'timestamp': None, 'features': None},
+    ...
+  ]
+}
+```
+
 
 ## File structure
 

@@ -56,7 +56,6 @@ gAllTrainStaySavePath = './Data/Output/Train/train_all_stay.pt'
 gAllTestStaySavePath = './Data/Output/Test/test_all_stay.pt'
 
 
-
 def GenerateTANS():
     """_summary_
     Temporal-aware Negative Sampling (TANS) for trajectory data.
