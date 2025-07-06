@@ -1,22 +1,5 @@
 # 1. 生成的负样本的格式如下：
-# sample format:
-# {
-#   'query': {
-#       'region': [...],     # regionID 序列
-#       'timestamp': [...],  # 时间戳序列
-#       'features': [...],   # 每个位置的其他特征
-#   },
-#   'pos': {
-#       'region': regionID_{t+1},
-#       'timestamp': ts_{t+1},
-#       'features': [...]
-#   },
-#   'neg': [
-#       {'region': r₁, 'timestamp': ts₁, 'features': [...]},
-#       {'region': r₂, 'timestamp': ts₂, 'features': [...]},
-#       ...
-#   ]
-# }
+
 
 # 2. 负样本的生成策略：Temporal-aware + In-batch + Geo-aware Hard Negatives
 #   1. 时间感知的负样本（Time-aware Negative Sampling, TANS）：也就在时间上前后的样本作为负样本。采样出时间上接近但不是当前轨迹的地点作为负样本。
@@ -56,6 +39,10 @@ gAllTrainStaySavePath = './Data/Output/Train/train_all_stay.pt'
 gAllTestStaySavePath = './Data/Output/Test/test_all_stay.pt'
 
 
+
+
+
+
 def GenerateTANS():
     """_summary_
     Temporal-aware Negative Sampling (TANS) for trajectory data.
@@ -87,6 +74,29 @@ def pad_to_multiple(tensor: torch.Tensor, multiple: int, pad_value=0):
     else:
         return F.pad(tensor, (0, pad_len), value=pad_value)
 
+# ```json
+# {
+#   'user': userID_q,
+#   'query': {
+#       'region': [...],
+#       'timestamp': [...],
+#       'features': [...],
+#   },
+#   'pos': {
+#       'user': userID_q,
+#       'region': regionID_t+1,
+#       'timestamp': ts_t+1,
+#       'features': [...]
+#   },
+#   'neg': [
+#       {'user': userID_1, 'region': r₁, 'timestamp': ts₁, 'features': [...]},
+#       {'user': userID_2, 'region': r₂, 'timestamp': ts₂, 'features': [...]},
+#   ]
+# }
+# ```
+def GenerateSample(userID, ):
+    pass
+
 
 def PreprocessSingleTrajectoryIndependent(ID, ID_map,
                                           StaySavePath,
@@ -115,8 +125,8 @@ def PreprocessSingleTrajectoryIndependent(ID, ID_map,
             return
 
         # Stay 数据处理
-        stay['loncol'], stay['latcol'] = tbd.GPS_to_grid(stay['lon'], stay['lat'], gGeoParameters)
-        stay = stay.apply(cc.GenerateGrid, axis=1)
+        # stay['loncol'], stay['latcol'] = tbd.GPS_to_grid(stay['lon'], stay['lat'], gGeoParameters)
+        stay = stay.apply(cc.GenerateGrid, lonColName='LONCOL', latColName='LATCOL',axis=1)
         stay = stay.merge(right=gAllGridMapping, on='grid', how='left').fillna(0)
 
         with Lock:

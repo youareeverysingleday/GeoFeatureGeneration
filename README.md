@@ -263,35 +263,109 @@ This package can concat multi vectorized features to one matrix.
 对比学习格式说明和示例：
 ```json
 {
+  'user': userID_q,
   'query': {
-      'region': [...],     # regionID 序列
-      'timestamp': [...],  # 时间戳序列
-      'features': [...],   # 每个位置的其他特征
+      'region': [...],
+      'timestamp': [...],
+      'features': [...],
   },
   'pos': {
-      'region': regionID_{t+1},
-      'timestamp': ts_{t+1},
+      'user': userID_q,
+      'region': regionID_t+1,
+      'timestamp': ts_t+1,
       'features': [...]
   },
   'neg': [
-      {'region': r₁, 'timestamp': ts₁, 'features': [...]},
-      {'region': r₂, 'timestamp': ts₂, 'features': [...]},
-      ...
+      {'user': userID_1, 'region': r₁, 'timestamp': ts₁, 'features': [...]},
+      {'user': userID_2, 'region': r₂, 'timestamp': ts₂, 'features': [...]},
   ]
 }
 ```
 
 ```json
 {
-  'query': [
-    (2356, '2025-05-25 19:25:36', [0.5, 1.2]), 
-    (1278, '2025-05-26 08:25:36', [2.1, 3.2])
-  ],
-  'pos': (1278, '2025-05-26 14:06:36', [1.7, 2.2]),
-  'neg': [
-    {'region': 3112, 'timestamp': None, 'features': None},
-    {'region': 1901, 'timestamp': None, 'features': None},
-    ...
+  "userID": 1,
+  "query": {
+    "region": ["wx4g0g1", "wx4g0g2", "wx4g0g3"],
+    "timestamp": ["2025-01-28 08:00:00", "2025-01-28 08:10:00", "2025-01-28 08:20:00"],
+    "features": [[0.1, 0.2], [0.3, 0.2], [0.4, 0.5]]
+  },
+  "pos": {
+    "region": "wx4g0g4",
+    "timestamp": "2025-01-28 08:30:00",
+    "features": [0.5, 0.6]
+  },
+  "neg": [
+    {
+      "region": "wx4g0ga",
+      "timestamp": "2025-01-28 08:30:00",
+      "features": [0.1, 0.1]
+    },
+    {
+      "region": "wx4g0gb",
+      "timestamp": "2025-01-28 08:35:00",
+      "features": [0.3, 0.4]
+    }
+  ]
+}
+{
+  "userID": 1,
+  "query": {
+    "region": ["wx4g0g2", "wx4g0g3", "wx4g0g4"],
+    "timestamp": ["2025-01-28 08:10:00", "2025-01-28 08:20:00", "2025-01-28 08:30:00"],
+    "features": [[0.3, 0.2], [0.4, 0.5], [0.5, 0.6]]
+  },
+  "pos": {
+    "region": "wx4g0g5",
+    "timestamp": "2025-01-28 08:40:00",
+    "features": [0.6, 0.7]
+  },
+  "neg": [
+    {
+      "region": "wx4g0gc",
+      "timestamp": "2025-01-28 08:40:00",
+      "features": [0.2, 0.2]
+    }
+  ]
+}
+{
+  "userID": 1,
+  "query": {
+    "region": ["wx4g0g3", "wx4g0g4", "wx4g0g5"],
+    "timestamp": ["2025-01-28 08:20:00", "2025-01-28 08:30:00", "2025-01-28 08:40:00"],
+    "features": [[0.4, 0.5], [0.5, 0.6], [0.6, 0.7]]
+  },
+  "pos": {
+    "region": "wx4g0g6",
+    "timestamp": "2025-01-28 08:50:00",
+    "features": [0.7, 0.8]
+  },
+  "neg": [
+    {
+      "region": "wx4g0gd",
+      "timestamp": "2025-01-28 08:50:00",
+      "features": [0.3, 0.3]
+    }
+  ]
+}
+{
+  "userID": 2,
+  "query": {
+    "region": ["wx4g0h1", "wx4g0h2", "wx4g0h3"],
+    "timestamp": ["2025-01-28 09:00:00", "2025-01-28 09:10:00", "2025-01-28 09:20:00"],
+    "features": [[0.2, 0.3], [0.4, 0.5], [0.5, 0.6]]
+  },
+  "pos": {
+    "region": "wx4g0h4",
+    "timestamp": "2025-01-28 09:30:00",
+    "features": [0.6, 0.7]
+  },
+  "neg": [
+    {
+      "region": "wx4g0hf",
+      "timestamp": "2025-01-28 09:30:00",
+      "features": [0.1, 0.2]
+    }
   ]
 }
 ```
