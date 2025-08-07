@@ -373,13 +373,22 @@ This package can concat multi vectorized features to one matrix.
 
 ## File structure
 
+```bash
 .
 ├─ README.md
+├─ Record.md # 处理记录。现在存放的主要是删除的部分代码。
 ├─ CommonCode.py # 公用代码。
 ├─ GenerateGeographicFeature.py # 特征生成。
 ├─ AttachFeature.py # 特征附着到轨迹上。
+├─ DP_GenerateTrajectory_ContainNegativeSample.py # 对比学习所需要的样本格式。
+├─ DP_GenerateTrajectory.json # 不包含对比学习内容的轨迹生成。
+├─ DP_GroupandSaveByID.json # 将输入的plt文件转换为按照用户ID存放的csv格式。
 ├─ Parameters.json
-├─ OldVersion
+├─ Foursquare # Foursquare 数据，但是明显不符合连续轨迹的要求。
+├─ Pictures
+│  ├─ FlowChart.png # 流程图。
+│  └─ FlowChart.vsd # 流程图。
+├─ PreviousVersion
 │  ├─ GenerateGeographicFeature_v1.0.3.py # 弃用。
 │  └─ GeoFeatureGeneration_v1.py # 弃用。
 ├─ Data
@@ -419,6 +428,7 @@ This package can concat multi vectorized features to one matrix.
 │  └─ Output
 │      └─ MultipleFeatures
 └─ Test
+```
 
 ## Package dependence
 
